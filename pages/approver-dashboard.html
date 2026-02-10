@@ -381,7 +381,6 @@ textarea:focus{
 <div class="topbar">
   <div class="topbarInner">
     <div class="brand">
-      <!-- GitHub Pages safe: explicit relative to /pages/ -->
       <img src="../assets/img/xime-logo.jpg" alt="XIME Logo">
       <div class="brandText">
         <div class="inst">Xavier Institute of Management and Entrepreneurship</div>
@@ -401,7 +400,6 @@ textarea:focus{
   <section id="pageDashboard">
     <div class="headerGrid">
 
-      <!-- My Profile -->
       <section class="panel">
         <div class="panelHead">
           <h3 class="panelTitle">My Profile</h3>
@@ -417,7 +415,6 @@ textarea:focus{
         </div>
       </section>
 
-      <!-- Dashboard -->
       <section class="panel">
         <div class="panelHead">
           <h3 class="panelTitle">Dashboard</h3>
@@ -493,6 +490,12 @@ textarea:focus{
     getFirestore, doc, getDoc, collection, getDocs, query, where, updateDoc,
     serverTimestamp, setDoc
   } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+  // ✅ IMPORTANT: prevent browser back/forward cache showing protected page after logout
+  // If page restored from bfcache, force reload so auth state is checked again.
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) window.location.reload();
+  });
 
   const firebaseConfig = {
     apiKey: "AIzaSyDgoq2rMU5kiKcz_27-hjBzd8rxS8yQqdY",
@@ -581,7 +584,6 @@ textarea:focus{
   function normalizeEmail(v){ return String(v || "").trim().toLowerCase(); }
   function normalizeRollno(v){ return String(v || "").trim().toUpperCase(); }
 
-  // Your expected mapping
   const YEAR_TO_BATCH = { "1":"Batch 9", "2":"Batch 8" };
 
   function showPage(which){
@@ -1100,6 +1102,35 @@ textarea:focus{
     });
   }
 
+  // ✅ Creates/updates public gatepass doc so QR works even without login
+  async function upsertPublicGatepass(requestId, requestRow){
+    const outVal = getOutDT(requestRow);
+    const inVal = getInDT(requestRow);
+
+    const payload = {
+      status: "approved",
+      approved_public_at: isoNow(),
+      // student identity
+      student_name: requestRow.student_name || requestRow.student?.name || "",
+      student_rollno: requestRow.student_rollno || requestRow.student?.rollno || "",
+      student_room_no: requestRow.student_room_no || requestRow.student?.room || requestRow.student?.roomNo || "",
+      student_email: requestRow.student_email || requestRow.studentEmail || requestRow.student?.email || "",
+      student_uid: requestRow.student_uid || requestRow.studentUid || requestRow.student?.uid || "",
+      // leave info
+      leave_type: requestRow.leave_type || "",
+      out_datetime: outVal || "",
+      in_datetime: inVal || "",
+      reason: requestRow.reason || "",
+      contact_no: requestRow.contact_no || requestRow.phone || requestRow.contact || "",
+      // optional photo link if present
+      photo_url: requestRow.photo_url || requestRow.photoUrl || requestRow.student_photo_url || "",
+      updatedAt: serverTimestamp(),
+      updated_at: serverTimestamp()
+    };
+
+    await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
+  }
+
   async function handleApprove(requestId){
     const r = cacheAllForApprover.find(x => x.id === requestId);
     if (!r) return;
@@ -1158,6 +1189,8 @@ textarea:focus{
       updatedAt: serverTimestamp()
     };
 
+    let isFinalApproved = false;
+
     if (nextEmail){
       updates.current_holder_email = nextEmail;
       updates.status = "pending";
@@ -1166,10 +1199,18 @@ textarea:focus{
       updates.status = "approved";
       updates.final_approved_by = currentUserEmailLower;
       updates.final_approved_at = isoNow();
+      isFinalApproved = true;
     }
 
     try{
       await updateDoc(doc(db, "leave_requests", requestId), updates);
+
+      // ✅ Create public gatepass doc ONLY on final approval
+      if (isFinalApproved){
+        // Use latest data we have (r + updates). r has all student fields already.
+        await upsertPublicGatepass(requestId, { ...r, ...updates });
+      }
+
       await refreshCache();
       computeDashboardMetrics();
       updateStatusCounts();
@@ -1227,9 +1268,9 @@ textarea:focus{
   }
 
   logoutBtn.addEventListener("click", async () => {
-    await signOut(auth);
-    // GitHub Pages safe (from /pages/ back to root index)
-    window.location.href = "../index.html";
+    try{ await signOut(auth); }catch(_){}
+    // ✅ Use replace so back button doesn't bring dashboard
+    window.location.replace("../index.html");
   });
 
   tabDashboard.addEventListener("click", () => showPage("dashboard"));
@@ -1266,7 +1307,8 @@ textarea:focus{
 
   onAuthStateChanged(auth, async (u) => {
     if (!u){
-      window.location.href = "../index.html";
+      // ✅ replace to stop back button re-opening this page
+      window.location.replace("../index.html");
       return;
     }
 
@@ -1300,8 +1342,8 @@ textarea:focus{
     }catch(err){
       console.error(err);
       alert(err?.message || "Unable to load approver role/data. Contact Admin.");
-      await signOut(auth);
-      window.location.href = "../index.html";
+      try{ await signOut(auth); }catch(_){}
+      window.location.replace("../index.html");
     }
   });
 </script>
