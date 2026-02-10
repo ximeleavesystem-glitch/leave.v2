@@ -395,7 +395,6 @@ textarea:focus{
 <div class="topbar">
   <div class="topbarInner">
     <div class="brand">
-      <!-- GitHub Pages safe: relative from /pages/ -->
       <img id="ximeLogo" src="../assets/img/xime-logo.jpg" alt="XIME Logo">
       <div class="brandText">
         <div class="inst">Xavier Institute of Management and Entrepreneurship</div>
@@ -550,8 +549,13 @@ textarea:focus{
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
   import {
     getFirestore, collection, getDocs, query, where, limit, updateDoc, doc,
-    serverTimestamp, getDoc
+    serverTimestamp, getDoc, setDoc
   } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+  // ✅ bfcache fix: if user presses back after logout, force reload (auth check runs)
+  window.addEventListener("pageshow", (e) => {
+    if (e.persisted) window.location.reload();
+  });
 
   const firebaseConfig = {
     apiKey: "AIzaSyDgoq2rMU5kiKcz_27-hjBzd8rxS8yQqdY",
@@ -564,12 +568,10 @@ textarea:focus{
 
   const DEAN_EMAIL = "deanacademicchennai@xime.org";
 
-  // ✅ GitHub Pages safe logo fallback (same folder strategy)
   const logo = document.getElementById("ximeLogo");
   logo.addEventListener("error", () => {
     if (!logo.dataset.try2){
       logo.dataset.try2 = "1";
-      // keep fallback relative too
       logo.src = "../assets/img/xime-logo.jpg";
       return;
     }
@@ -592,18 +594,15 @@ textarea:focus{
   const pageIntimations = document.getElementById("pageIntimations");
   const pageHistory = document.getElementById("pageHistory");
 
-  // Dashboard date filter
   const dFrom = document.getElementById("dFrom");
   const dTo = document.getElementById("dTo");
   const applyDashBtn = document.getElementById("applyDashBtn");
   const clearDashBtn = document.getElementById("clearDashBtn");
 
-  // Overall metrics
   const mApprovedSingle = document.getElementById("mApprovedSingle");
   const mApprovedOne = document.getElementById("mApprovedOne");
   const mApprovedExtended = document.getElementById("mApprovedExtended");
 
-  // Dean metrics
   const mDeanPending = document.getElementById("mDeanPending");
   const mDeanApproved = document.getElementById("mDeanApproved");
   const mDeanRejected = document.getElementById("mDeanRejected");
@@ -631,6 +630,28 @@ textarea:focus{
 
   function normalizeEmail(v){ return String(v||"").trim().toLowerCase(); }
   function isoNow(){ return new Date().toISOString(); }
+
+  // ✅ Create/update public gatepass doc (so QR works without login)
+  async function upsertPublicGatepass(requestId, r){
+    const payload = {
+      status: "approved",
+      approved_public_at: isoNow(),
+      student_name: r.student_name || r.student?.name || "",
+      student_rollno: r.student_rollno || r.student?.rollno || "",
+      student_room_no: r.student_room_no || r.student?.room || r.student?.roomNo || "",
+      student_email: r.student_email || r.studentEmail || r.student?.email || "",
+      student_uid: r.student_uid || r.studentUid || r.student?.uid || "",
+      leave_type: r.leave_type || "extended",
+      out_datetime: r.out_datetime || r.outDT || r.outDateTime || "",
+      in_datetime: r.in_datetime || r.inDT || r.inDateTime || "",
+      reason: r.reason || "",
+      contact_no: r.contact_no || r.phone || r.contact || "",
+      photo_url: r.photo_url || r.photoUrl || r.student_photo_url || r.studentPhotoUrl || "",
+      updatedAt: serverTimestamp(),
+      updated_at: serverTimestamp()
+    };
+    await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
+  }
 
   // ✅ Drive-photo resolver logic
   function extractDriveId(url){
@@ -727,9 +748,9 @@ textarea:focus{
   tabHistory.addEventListener("click", async () => { showPage("history"); await loadHistory(); });
 
   logoutBtn.addEventListener("click", async () => {
-    await signOut(auth);
-    // GitHub Pages safe: from /pages/ back to root
-    window.location.href = "../index.html";
+    try{ await signOut(auth); }catch(_){}
+    // ✅ replace so back button won't re-open the dean page
+    window.location.replace("../index.html");
   });
 
   function buildAvatarNode(studentName, photoRaw){
@@ -1205,6 +1226,10 @@ textarea:focus{
 
     try{
       await updateDoc(ref, updates);
+
+      // ✅ create public gatepass doc for QR / gatepass public page
+      await upsertPublicGatepass(id, { ...r, ...updates });
+
       await loadDashboard();
       if (!fromHistory) await loadApprovals();
       await loadHistory();
@@ -1256,13 +1281,13 @@ textarea:focus{
 
   onAuthStateChanged(auth, async (u) => {
     if (!u){
-      window.location.href = "../index.html";
+      window.location.replace("../index.html");
       return;
     }
     if (normalizeEmail(u.email) !== normalizeEmail(DEAN_EMAIL)){
       alert("Access denied. Dean only.");
-      await signOut(auth);
-      window.location.href = "../index.html";
+      try{ await signOut(auth); }catch(_){}
+      window.location.replace("../index.html");
       return;
     }
 
