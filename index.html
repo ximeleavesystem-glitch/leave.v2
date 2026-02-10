@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XIME — Leave Management System</title>
+
+  <style>
+    :root{
+      --red:#c1121f; --redDark:#9b0f19;
+      --ink:#111827; --muted:#6b7280;
+      --line:#e5e7eb; --soft:#f9fafb; --card:#ffffff;
+      --good:#0f766e; --bad:#b42318;
+      --shadow: 0 18px 50px rgba(17,24,39,.10);
+      --radius: 18px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    }
+    *{ box-sizing:border-box; }
+    body{
+      margin:0; font-family:var(--font); color:var(--ink);
+      background:
+        radial-gradient(1000px 520px at 20% 0%, rgba(193,18,31,.09), transparent 55%),
+        radial-gradient(900px 500px at 90% 10%, rgba(193,18,31,.07), transparent 55%),
+        linear-gradient(180deg, #fff 0%, #fff 70%, #fafafa 100%);
+      min-height:100vh; display:flex; align-items:center; justify-content:center;
+      padding:26px 18px;
+    }
+
+    .wrap{ width:min(560px, 100%); }
+
+    /* HEADER (fixed: not oversized, better alignment, bigger college name) */
+    .header{
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      gap:14px;
+      margin-bottom:14px;
+      padding:8px 0;
+    }
+    .logoImg{
+      width:92px;
+      height:auto;
+      max-height:56px;
+      object-fit:contain;
+      display:block;
+      flex:0 0 auto;
+      filter: drop-shadow(0 6px 12px rgba(17,24,39,.08));
+    }
+    .headText{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      text-align:left;
+      line-height:1.15;
+      min-width:0;
+    }
+    .inst{
+      margin:0;
+      font-size:22px;           /* increased as requested */
+      font-weight:900;
+      letter-spacing:.15px;
+      white-space:normal;
+      word-break:break-word;
+    }
+    .sys{
+      margin:0;
+      font-size:20px;
+      font-weight:900;
+      color:var(--red);
+      letter-spacing:.2px;
+    }
+
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+
+    .tabs{ display:flex; gap:10px; padding:16px 18px 0; }
+    .tab{
+      flex:1; border:1px solid var(--line); background:#fff;
+      padding:11px 12px; border-radius:14px; cursor:pointer;
+      font-weight:800; font-size:13px; transition:.15s ease;
+    }
+    .tab:hover{ border-color: rgba(193,18,31,.35); transform: translateY(-1px); }
+    .tab.active{
+      border-color: rgba(193,18,31,.55);
+      background: rgba(193,18,31,.06);
+      color: var(--redDark);
+      box-shadow: 0 10px 20px rgba(193,18,31,.10);
+    }
+
+    form{ padding:16px 18px 18px; display:flex; flex-direction:column; gap:12px; }
+    .field{ display:flex; flex-direction:column; gap:6px; }
+
+    label{ font-size:12px; color:var(--muted); font-weight:700; }
+    input{
+      border:1px solid var(--line); background:#fff; color:var(--ink);
+      padding:12px; border-radius:14px; outline:none; font-size:14px; transition:.15s ease;
+    }
+    input:focus{ border-color: rgba(193,18,31,.55); box-shadow: 0 0 0 4px rgba(193,18,31,.12); }
+
+    .row{ display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-top:2px; }
+    .check{ display:flex; align-items:center; gap:8px; color:var(--muted); font-size:12.5px; font-weight:600; user-select:none; }
+    .check input{ width:16px;height:16px; accent-color: var(--red); }
+
+    .btn{
+      margin-top:6px; border:none; border-radius:14px;
+      padding:12px 14px; cursor:pointer; font-weight:900; color:white;
+      background: linear-gradient(135deg, var(--red), #ff3b3b);
+      box-shadow: 0 12px 24px rgba(193,18,31,.18);
+      transition:.15s ease; font-size:14px;
+      position:relative;
+    }
+    .btn:hover{ transform: translateY(-1px); }
+    .btn:disabled{ opacity:.60; cursor:not-allowed; transform:none; }
+
+    .ghost{ border:1px solid var(--line); background:#fff; color:#111827; box-shadow:none; }
+    .ghost:hover{ border-color: rgba(193,18,31,.35); }
+
+    /* Loading state without changing button text (fixes “Working…”) */
+    .btn.loading{
+      pointer-events:none;
+      opacity:.75;
+    }
+    .btn.loading::after{
+      content:"";
+      position:absolute;
+      right:14px;
+      top:50%;
+      width:14px;
+      height:14px;
+      margin-top:-7px;
+      border-radius:999px;
+      border:2px solid rgba(255,255,255,.55);
+      border-top-color:#fff;
+      animation: spin .7s linear infinite;
+    }
+    @keyframes spin{ to{ transform:rotate(360deg); } }
+
+    .toast{
+      margin-top:6px; border-radius:14px; padding:10px 12px;
+      border:1px solid var(--line); background:#fff; display:none;
+      font-size:13px; line-height:1.45; font-weight:600;
+    }
+    .toast.show{ display:block; }
+    .toast.good{ border-color: rgba(15,118,110,.25); background: rgba(15,118,110,.06); color:#0f3d39; }
+    .toast.bad{ border-color: rgba(180,35,24,.22); background: rgba(180,35,24,.06); color:#5a1110; }
+
+    .hint{ font-size:12px; color:var(--muted); margin-top:2px; font-weight:600; }
+    .hidden{ display:none !important; }
+
+    /* Small screens: keep header neat */
+    @media (max-width: 420px){
+      .header{ gap:10px; }
+      .logoImg{ width:74px; max-height:48px; }
+      .inst{ font-size:18px; }
+      .sys{ font-size:17px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrap">
+    <div class="header">
+      <!-- GitHub Pages safe relative path -->
+      <img class="logoImg" src="./assets/img/xime-logo.jpg" alt="XIME Logo" />
+      <div class="headText">
+        <h1 class="inst">Xavier Institute of Management and Entrepreneurship</h1>
+        <p class="sys">Leave Management System</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="tabs">
+        <button class="tab active" id="tabLogin" type="button">Login</button>
+        <button class="tab" id="tabRegister" type="button">Register</button>
+      </div>
+
+      <form id="loginForm" autocomplete="on">
+        <div class="field">
+          <label for="loginEmail">Email</label>
+          <input id="loginEmail" type="email" placeholder="XIME mail id" required />
+        </div>
+        <div class="field">
+          <label for="loginPassword">Password</label>
+          <input id="loginPassword" type="password" placeholder="••••••••" required />
+        </div>
+        <div class="row">
+          <label class="check">
+            <input id="remember" type="checkbox" />
+            Remember me
+          </label>
+        </div>
+        <button class="btn" id="loginBtn" type="submit">Login</button>
+        <div id="toastLogin" class="toast"></div>
+      </form>
+
+      <form id="registerForm" class="hidden" autocomplete="off">
+        <div class="field" id="rollField">
+          <label for="regRoll">Roll Number</label>
+          <input id="regRoll" type="text" placeholder="C08001" />
+        </div>
+
+        <div class="field">
+          <label for="regEmail">Email</label>
+          <input id="regEmail" type="email" placeholder="XIME mail id" required />
+          <div class="hint" id="roleHint">Enter your official email to continue.</div>
+        </div>
+
+        <div class="field">
+          <label for="regPassword">Create Password</label>
+          <input id="regPassword" type="password" placeholder="Minimum 6 characters" required />
+        </div>
+
+        <div class="field">
+          <label for="regConfirm">Confirm Password</label>
+          <input id="regConfirm" type="password" placeholder="Re-enter password" required />
+        </div>
+
+        <button class="btn" id="registerBtn" type="submit">Create Account</button>
+        <button class="btn ghost" id="backToLoginBtn" type="button">Back</button>
+
+        <div id="toastRegister" class="toast"></div>
+      </form>
+    </div>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import {
+      getAuth, setPersistence, browserSessionPersistence, browserLocalPersistence,
+      createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut
+    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+    import {
+      getFirestore, doc, getDoc, setDoc, serverTimestamp,
+      collection, query, where, getDocs
+    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDgoq2rMU5kiKcz_27-hjBzd8rxS8yQqdY",
+      authDomain: "xime-leave-system-b25a4.firebaseapp.com",
+      projectId: "xime-leave-system-b25a4",
+      storageBucket: "xime-leave-system-b25a4.firebasestorage.app",
+      messagingSenderId: "802112635142",
+      appId: "1:802112635142:web:0fd0f5ad1ae3ef8eb4de87"
+    };
+
+    const tabLogin = document.getElementById("tabLogin");
+    const tabRegister = document.getElementById("tabRegister");
+    const loginForm = document.getElementById("loginForm");
+    const registerForm = document.getElementById("registerForm");
+    const backToLoginBtn = document.getElementById("backToLoginBtn");
+
+    const loginEmail = document.getElementById("loginEmail");
+    const loginPassword = document.getElementById("loginPassword");
+    const remember = document.getElementById("remember");
+    const loginBtn = document.getElementById("loginBtn");
+    const toastLogin = document.getElementById("toastLogin");
+
+    const rollField = document.getElementById("rollField");
+    const regRoll = document.getElementById("regRoll");
+    const regEmail = document.getElementById("regEmail");
+    const roleHint = document.getElementById("roleHint");
+    const regPassword = document.getElementById("regPassword");
+    const regConfirm = document.getElementById("regConfirm");
+    const registerBtn = document.getElementById("registerBtn");
+    const toastRegister = document.getElementById("toastRegister");
+
+    let app, auth, db;
+    let detectedRole = "student";
+    let roleLookupTimer = null;
+
+    function showToast(el, msg, type="good"){
+      el.className = "toast show " + (type === "bad" ? "bad" : "good");
+      el.textContent = msg;
+    }
+    function clearToast(el){ el.className = "toast"; el.textContent = ""; }
+
+    function normalizeEmail(v){ return String(v || "").trim().toLowerCase(); }
+    function normalizeRoll(v){ return String(v || "").trim().toUpperCase(); }
+
+    function initFirebase(){
+      if (!app){
+        app = initializeApp(firebaseConfig);
+        auth = getAuth(app);
+        db = getFirestore(app);
+      }
+    }
+
+    // More robust role resolve:
+    // 1) Try by doc id (email)
+    // 2) If not found, try query by field "email" == email (covers mismatch in doc id)
+    // If reads are blocked by rules, it will throw and we fallback to student.
+    async function resolveRoleByEmail(email){
+      const e = normalizeEmail(email);
+      if (!e || !e.includes("@")) return "student";
+
+      // admins first
+      try{
+        const adminSnap = await getDoc(doc(db, "admins", e));
+        if (adminSnap.exists()) return "dean";
+      }catch(_){ /* ignore, fallback below */ }
+
+      try{
+        const adminQ = query(collection(db, "admins"), where("email", "==", e));
+        const adminQS = await getDocs(adminQ);
+        if (!adminQS.empty) return "dean";
+      }catch(_){ /* ignore */ }
+
+      // approvers next
+      try{
+        const apprSnap = await getDoc(doc(db, "approvers", e));
+        if (apprSnap.exists()) return "approver";
+      }catch(_){ /* ignore */ }
+
+      try{
+        const apprQ = query(collection(db, "approvers"), where("email", "==", e));
+        const apprQS = await getDocs(apprQ);
+        if (!apprQS.empty) return "approver";
+      }catch(_){ /* ignore */ }
+
+      return "student";
+    }
+
+    function applyRoleUI(role){
+      if (role === "approver" || role === "dean"){
+        rollField.classList.add("hidden");
+        regRoll.value = "";
+        roleHint.textContent = "Roll number not required for this email.";
+      } else {
+        rollField.classList.remove("hidden");
+        roleHint.textContent = "Roll number required for student email.";
+      }
+    }
+
+    function routeByRole(role){
+      if (role === "student") window.location.href = "./pages/student-dashboard.html";
+      else if (role === "approver") window.location.href = "./pages/approver-dashboard.html";
+      else if (role === "dean") window.location.href = "./pages/dean-dashboard.html";
+      else showToast(toastLogin, "Unknown role. Cannot route.", "bad");
+    }
+
+    function switchToLogin(){
+      tabLogin.classList.add("active");
+      tabRegister.classList.remove("active");
+      loginForm.classList.remove("hidden");
+      registerForm.classList.add("hidden");
+      clearToast(toastLogin); clearToast(toastRegister);
+    }
+
+    function switchToRegister(){
+      tabRegister.classList.add("active");
+      tabLogin.classList.remove("active");
+      registerForm.classList.remove("hidden");
+      loginForm.classList.add("hidden");
+      clearToast(toastLogin); clearToast(toastRegister);
+      detectedRole = "student";
+      applyRoleUI("student");
+      roleHint.textContent = "Enter your official email to continue.";
+    }
+
+    tabLogin.addEventListener("click", switchToLogin);
+    tabRegister.addEventListener("click", switchToRegister);
+    backToLoginBtn.addEventListener("click", switchToLogin);
+
+    // On typing: keep student UI until we confirm role (no flicker)
+    regEmail.addEventListener("input", () => {
+      detectedRole = "student";
+      applyRoleUI("student");
+      clearToast(toastRegister);
+
+      // Debounced role lookup for better UX
+      if (roleLookupTimer) clearTimeout(roleLookupTimer);
+      roleLookupTimer = setTimeout(async () => {
+        initFirebase();
+        const email = normalizeEmail(regEmail.value);
+        if (!email || !email.includes("@")) return;
+
+        try{
+          const role = await resolveRoleByEmail(email);
+          detectedRole = role;
+          applyRoleUI(role);
+        }catch{
+          detectedRole = "student";
+          applyRoleUI("student");
+        }
+      }, 350);
+    });
+
+    // Also run on blur (if user pastes and leaves immediately)
+    regEmail.addEventListener("blur", async () => {
+      initFirebase();
+      const email = normalizeEmail(regEmail.value);
+      if (!email || !email.includes("@")) return;
+
+      try{
+        const role = await resolveRoleByEmail(email);
+        detectedRole = role;
+        applyRoleUI(role);
+      }catch{
+        detectedRole = "student";
+        applyRoleUI("student");
+      }
+    });
+
+    loginForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearToast(toastLogin);
+      initFirebase();
+
+      const email = normalizeEmail(loginEmail.value);
+      const password = loginPassword.value;
+
+      // Loading without changing text (fix “Working…”)
+      loginBtn.classList.add("loading");
+
+      try{
+        await setPersistence(auth, remember.checked ? browserLocalPersistence : browserSessionPersistence);
+        await signInWithEmailAndPassword(auth, email, password);
+
+        showToast(toastLogin, "Login successful. Routing…", "good");
+
+        const role = await resolveRoleByEmail(email);
+        setTimeout(() => routeByRole(role), 150);
+      }catch(err){
+        const msg = (err?.message || "Login failed.")
+          .replace("Firebase: ", "")
+          .replace(/\(auth\/[^\)]+\)/g, "")
+          .trim();
+        showToast(toastLogin, msg, "bad");
+      }finally{
+        loginBtn.classList.remove("loading");
+      }
+    });
+
+    registerForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearToast(toastRegister);
+      initFirebase();
+      registerBtn.classList.add("loading");
+
+      const email = normalizeEmail(regEmail.value);
+      const pass = regPassword.value;
+      const confirm = regConfirm.value;
+      const roll = normalizeRoll(regRoll.value);
+
+      try{
+        if (!email.includes("@")) throw new Error("Enter a valid email address.");
+        if (pass.length < 6) throw new Error("Password must be at least 6 characters.");
+        if (pass !== confirm) throw new Error("Passwords do not match.");
+
+        let role = "student";
+        try { role = await resolveRoleByEmail(email); } catch { role = "student"; }
+        detectedRole = role;
+        applyRoleUI(role);
+
+        if (role === "approver" || role === "dean"){
+          const cred = await createUserWithEmailAndPassword(auth, email, pass);
+          await setDoc(doc(db, "users", cred.user.uid), {
+            email, role, createdAt: serverTimestamp(), rosterLinked: true
+          }, { merge: true });
+
+          showToast(toastRegister, "Account created successfully. Please login.", "good");
+          loginEmail.value = email; loginPassword.value = "";
+          setTimeout(switchToLogin, 450);
+          return;
+        }
+
+        if (!roll || roll.length < 3) throw new Error("Enter a valid Roll Number.");
+
+        const rosterSnap = await getDoc(doc(db, "students_roster", roll));
+        if (!rosterSnap.exists()) throw new Error("Registration blocked: Contact Batch Coordinator.");
+        const roster = rosterSnap.data() || {};
+        if (normalizeEmail(roster.email) !== email) throw new Error("Registration blocked: Contact Batch Coordinator.");
+
+        const cred = await createUserWithEmailAndPassword(auth, email, pass);
+        await setDoc(doc(db, "users", cred.user.uid), {
+          email, role:"student", rollno: roll, createdAt: serverTimestamp(), rosterLinked: true
+        }, { merge: true });
+
+        showToast(toastRegister, "Account created successfully. Please login.", "good");
+        loginEmail.value = email; loginPassword.value = "";
+        regPassword.value = ""; regConfirm.value = "";
+        setTimeout(switchToLogin, 450);
+
+      }catch(err){
+        const msg = (err?.message || "Registration failed.")
+          .replace("Firebase: ", "")
+          .replace(/\(auth\/[^\)]+\)/g, "")
+          .trim();
+        showToast(toastRegister, msg, "bad");
+      }finally{
+        registerBtn.classList.remove("loading");
+      }
+    });
+
+    (function boot(){
+      switchToLogin();
+      initFirebase();
+      if (auth.currentUser) { signOut(auth).catch(()=>{}); }
+    })();
+  </script>
+</body>
+</html>

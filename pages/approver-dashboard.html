@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>XIME — Approver Dashboard</title>
+
+<style>
+:root{
+  --red:#c1121f;
+  --redDark:#9b0f19;
+  --ink:#0f172a;
+  --muted:#64748b;
+  --line:#e2e8f0;
+  --soft:#f8fafc;
+  --card:#ffffff;
+
+  --good:#0f766e;
+  --bad:#b42318;
+  --warn:#b54708;
+
+  --shadow: 0 18px 55px rgba(2,6,23,.10);
+  --shadow2: 0 10px 24px rgba(2,6,23,.08);
+
+  --radius:18px;
+  --radius2:14px;
+  --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+}
+
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:var(--font);
+  background:
+    radial-gradient(1000px 520px at 20% 0%, rgba(193,18,31,.08), transparent 55%),
+    radial-gradient(900px 500px at 90% 10%, rgba(193,18,31,.06), transparent 55%),
+    linear-gradient(180deg, #fff 0%, #fff 70%, #fafafa 100%);
+  color:var(--ink);
+}
+
+.topbar{
+  position:sticky; top:0; z-index:10;
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(10px);
+  border-bottom:1px solid var(--line);
+}
+.topbarInner{
+  max-width:1200px;
+  margin:auto;
+  padding:14px 18px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.brand{ display:flex; gap:12px; align-items:center; min-width:0; }
+.brand img{ width:110px; max-height:54px; object-fit:contain; display:block; }
+.brandText{ line-height:1.1; min-width:0; }
+.brandText .inst{ font-size:14px; font-weight:900; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:#0f172a; }
+.brandText .sys{ font-size:18px; font-weight:950; color:var(--red); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+
+.btn{
+  border:none;
+  border-radius:14px;
+  padding:10px 14px;
+  font-weight:950;
+  cursor:pointer;
+  color:#fff;
+  background:linear-gradient(135deg,var(--red),var(--redDark));
+  box-shadow: 0 12px 26px rgba(193,18,31,.20);
+  transition:.15s ease;
+}
+.btn:hover{ transform: translateY(-1px); box-shadow: 0 16px 34px rgba(193,18,31,.25); }
+.btn:active{ transform: translateY(0px) scale(.99); }
+
+.wrap{ max-width:1200px; margin:auto; padding:20px 18px 28px; }
+
+.mainTabs{
+  display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;
+}
+.mainTab{
+  border:1px solid var(--line);
+  background:#fff;
+  padding:10px 12px;
+  border-radius:14px;
+  cursor:pointer;
+  font-weight:950;
+  font-size:13px;
+  color:#0f172a;
+  transition:.15s ease;
+  min-width:160px;
+  text-align:center;
+  box-shadow: 0 8px 18px rgba(2,6,23,.05);
+}
+.mainTab:hover{ border-color: rgba(193,18,31,.35); transform: translateY(-1px); }
+.mainTab.active{
+  border-color: rgba(193,18,31,.55);
+  background: rgba(193,18,31,.06);
+  color: var(--redDark);
+  box-shadow: 0 14px 28px rgba(193,18,31,.10);
+}
+
+.panel{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.panelHead{
+  padding:14px 16px 10px;
+  border-bottom:1px solid var(--line);
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+.panelTitle{ margin:0; font-size:16px; font-weight:1000; }
+.panelBody{ padding:14px 16px 16px; }
+.hidden{ display:none !important; }
+
+.headerGrid{
+  display:grid;
+  grid-template-columns: 340px 1fr;
+  gap:14px;
+  margin-bottom:14px;
+  align-items: start;
+}
+@media(max-width: 900px){ .headerGrid{ grid-template-columns:1fr; } }
+
+/* Profile */
+.approverName{ font-size:18px; font-weight:1050; letter-spacing:.2px; }
+.approverMeta{
+  margin-top:8px;
+  font-size:13px;
+  color:#0f172a;
+  font-weight:750;
+  line-height:1.6;
+}
+.metaLine{
+  padding:8px 10px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  background: rgba(15,23,42,.02);
+  margin-top:8px;
+}
+.metaLine b{ color: var(--redDark); }
+
+/* Filters / Dashboard */
+.filterBar{
+  display:grid;
+  grid-template-columns: 1.2fr 1fr 1fr 140px;
+  gap:10px;
+  margin-bottom:12px;
+}
+@media(max-width: 980px){ .filterBar{ grid-template-columns:1fr 1fr; } }
+.filterBox{
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:var(--soft);
+  padding:10px 12px;
+}
+.filterBox label{
+  display:block;
+  font-size:11px;
+  color:var(--muted);
+  font-weight:900;
+  letter-spacing:.2px;
+  margin-bottom:6px;
+}
+select, input{
+  width:100%;
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:10px 10px;
+  font-size:13px;
+  font-weight:800;
+  outline:none;
+  background:#fff;
+}
+select:focus, input:focus{
+  border-color: rgba(193,18,31,.55);
+  box-shadow: 0 0 0 4px rgba(193,18,31,.12);
+}
+.applyBtn{
+  height:42px;
+  align-self:end;
+  border:none;
+  border-radius:14px;
+  padding:0 14px;
+  background: linear-gradient(135deg, var(--red), var(--redDark));
+  color:#fff;
+  font-weight:950;
+  cursor:pointer;
+  box-shadow: 0 12px 26px rgba(193,18,31,.18);
+  transition:.15s ease;
+}
+.applyBtn:hover{ transform: translateY(-1px); box-shadow: 0 16px 34px rgba(193,18,31,.22); }
+
+.metrics{ display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; }
+@media(max-width: 1050px){ .metrics{ grid-template-columns: repeat(2, 1fr); } }
+.metric{
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:var(--soft);
+  padding:12px;
+  box-shadow: var(--shadow2);
+}
+.metric .k{ font-size:11px; color:var(--muted); font-weight:950; letter-spacing:.2px; }
+.metric .v{ margin-top:6px; font-size:24px; font-weight:1100; }
+
+/* Leave tabs */
+.leaveTabs{ display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
+.leaveTab{
+  flex:1;
+  padding:12px;
+  border-radius:16px;
+  border:1px solid var(--line);
+  background:#fff;
+  font-weight:950;
+  cursor:pointer;
+  text-align:center;
+  transition:.15s ease;
+  box-shadow: 0 10px 22px rgba(2,6,23,.06);
+  min-width: 160px;
+}
+.leaveTab:hover{ transform: translateY(-1px); border-color: rgba(193,18,31,.35); }
+.leaveTab.active{
+  background:rgba(193,18,31,.08);
+  border-color:rgba(193,18,31,.5);
+  color:var(--redDark);
+  box-shadow: 0 14px 28px rgba(193,18,31,.10);
+}
+
+/* Status tabs */
+.statusTabs{ display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+.statusTab{
+  padding:9px 12px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:#fff;
+  font-weight:950;
+  cursor:pointer;
+  transition:.15s ease;
+  display:flex; align-items:center; gap:8px;
+  box-shadow: 0 10px 22px rgba(2,6,23,.06);
+}
+.statusTab:hover{ transform: translateY(-1px); border-color: rgba(193,18,31,.35); }
+.statusTab.active{
+  background:rgba(193,18,31,.08);
+  border-color:rgba(193,18,31,.5);
+  color:var(--redDark);
+}
+.count{
+  border:1px solid var(--line);
+  background:#fff;
+  border-radius:999px;
+  padding:3px 8px;
+  font-size:12px;
+  font-weight:950;
+  min-width:30px;
+  text-align:center;
+}
+
+/* Cards */
+.requestCard{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  padding:16px;
+  margin-bottom:14px;
+}
+.cardTop{ display:flex; justify-content:space-between; align-items:flex-start; gap:10px; flex-wrap:wrap; }
+.studentBlock{ display:flex; gap:12px; align-items:center; min-width:0; }
+
+.studentPhoto{
+  width:70px; height:92px;
+  border-radius:18px;
+  border:1px solid var(--line);
+  background:var(--soft);
+  object-fit:cover;
+  display:block;
+}
+.studentAvatar{
+  width:70px; height:92px;
+  border-radius:18px;
+  border:1px dashed rgba(193,18,31,.35);
+  background: rgba(193,18,31,.05);
+  display:grid;
+  place-items:center;
+  color:var(--redDark);
+  font-weight:1100;
+  letter-spacing:.5px;
+  text-transform:uppercase;
+}
+.studentText{ min-width:0; }
+.studentName{ font-size:18px; font-weight:1050; }
+.studentMeta{ margin-top:4px; font-size:13.5px; color:var(--muted); font-weight:750; }
+
+.reqCountLine{
+  margin-top:8px;
+  padding:8px 10px;
+  border-radius:14px;
+  background: rgba(193,18,31,.06);
+  border: 1px dashed rgba(193,18,31,.35);
+  color: var(--redDark);
+  font-weight:900;
+  font-size:13px;
+}
+
+.badge{
+  padding:7px 12px;
+  border-radius:999px;
+  font-size:12px;
+  font-weight:950;
+  white-space:nowrap;
+}
+.pending{background:rgba(181,71,8,.08); color:var(--warn)}
+.approved{background:rgba(15,118,110,.08); color:var(--good)}
+.rejected{background:rgba(180,35,24,.08); color:var(--bad)}
+
+.details{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-top:14px;
+}
+@media(max-width:700px){ .details{ grid-template-columns:1fr } }
+
+.kv{
+  background:var(--soft);
+  border-radius:16px;
+  padding:12px;
+  border:1px solid var(--line);
+}
+.kv .k{ font-size:11px; color:var(--muted); font-weight:900; letter-spacing:.2px; }
+.kv .v{ margin-top:6px; font-size:15px; font-weight:1000; letter-spacing:.1px; }
+.reasonBox{ grid-column:1/-1; }
+
+textarea{
+  width:100%;
+  margin-top:10px;
+  padding:12px;
+  border-radius:16px;
+  border:1px solid var(--line);
+  font-family:var(--font);
+  font-size:14px;
+  resize:vertical;
+  min-height:86px;
+  outline:none;
+}
+textarea:focus{
+  border-color: rgba(193,18,31,.55);
+  box-shadow: 0 0 0 4px rgba(193,18,31,.12);
+}
+
+/* Action buttons - more professional */
+.actions{ margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; }
+.actionBtn{
+  border:none;
+  padding:11px 18px;
+  border-radius:16px;
+  font-weight:1050;
+  cursor:pointer;
+  transition: .15s ease;
+  box-shadow: 0 12px 24px rgba(2,6,23,.14);
+  letter-spacing:.2px;
+  color:#fff;
+}
+.actionBtn:hover{ transform: translateY(-1px); box-shadow: 0 16px 34px rgba(2,6,23,.18); }
+.actionBtn:active{ transform: translateY(0px) scale(.99); }
+.actionBtn:disabled{ cursor:not-allowed; opacity:.55; transform:none; box-shadow:none; }
+
+.approveBtn{ background: linear-gradient(135deg, var(--good), #14b8a6); }
+.rejectBtn{ background: linear-gradient(135deg, var(--bad), #ff3b3b); }
+</style>
+</head>
+
+<body>
+<div class="topbar">
+  <div class="topbarInner">
+    <div class="brand">
+      <!-- GitHub Pages safe: explicit relative to /pages/ -->
+      <img src="../assets/img/xime-logo.jpg" alt="XIME Logo">
+      <div class="brandText">
+        <div class="inst">Xavier Institute of Management and Entrepreneurship</div>
+        <div class="sys">Leave Management System</div>
+      </div>
+    </div>
+    <button class="btn" id="logoutBtn" type="button">Logout</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="mainTabs">
+    <div class="mainTab active" id="tabDashboard" type="button">Dashboard</div>
+    <div class="mainTab" id="tabRequests" type="button">Requests</div>
+  </div>
+
+  <section id="pageDashboard">
+    <div class="headerGrid">
+
+      <!-- My Profile -->
+      <section class="panel">
+        <div class="panelHead">
+          <h3 class="panelTitle">My Profile</h3>
+        </div>
+        <div class="panelBody">
+          <div class="approverName" id="apName">—</div>
+
+          <div class="approverMeta">
+            <div class="metaLine" id="lineEmail"><b>Email</b> — <span id="apEmail">—</span></div>
+            <div class="metaLine" id="lineWarden" style="display:none;"><b>Warden</b> — <span id="apWarden">—</span></div>
+            <div class="metaLine" id="lineBC" style="display:none;"><b>Batch Coordinator</b> — <span id="apBC">—</span></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Dashboard -->
+      <section class="panel">
+        <div class="panelHead">
+          <h3 class="panelTitle">Dashboard</h3>
+        </div>
+        <div class="panelBody">
+          <div class="filterBar">
+            <div class="filterBox">
+              <label>Leave Type</label>
+              <select id="fType">
+                <option value="all">All</option>
+                <option value="single">Single Day</option>
+                <option value="one">One Day</option>
+                <option value="extended">Extended Leave</option>
+              </select>
+            </div>
+            <div class="filterBox">
+              <label>From Date</label>
+              <input id="fFrom" type="date">
+            </div>
+            <div class="filterBox">
+              <label>To Date</label>
+              <input id="fTo" type="date">
+            </div>
+            <button class="applyBtn" type="button" id="applyFilters">Apply</button>
+          </div>
+
+          <div class="metrics">
+            <div class="metric"><div class="k">TOTAL REQUESTS</div><div class="v" id="mTotal">0</div></div>
+            <div class="metric"><div class="k">PENDING</div><div class="v" id="mPending">0</div></div>
+            <div class="metric"><div class="k">APPROVED</div><div class="v" id="mApproved">0</div></div>
+            <div class="metric"><div class="k">REJECTED</div><div class="v" id="mRejected">0</div></div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </section>
+
+  <section id="pageRequests" class="hidden">
+    <div id="reqFilterWrap" class="filterBar" style="grid-template-columns: 1fr 1fr 140px; margin-bottom:12px;">
+      <div class="filterBox">
+        <label>From Date (Out)</label>
+        <input id="rFrom" type="date">
+      </div>
+      <div class="filterBox">
+        <label>To Date (Out)</label>
+        <input id="rTo" type="date">
+      </div>
+      <button class="applyBtn" type="button" id="applyReqFilters">Apply</button>
+    </div>
+
+    <div class="leaveTabs">
+      <div class="leaveTab active" id="tSingle">Single Day</div>
+      <div class="leaveTab" id="tOne">One Day</div>
+      <div class="leaveTab" id="tExtended">Extended Leave</div>
+    </div>
+
+    <div class="statusTabs">
+      <div class="statusTab active" id="sPending">Pending <span class="count" id="cPending">0</span></div>
+      <div class="statusTab" id="sApproved">Approved <span class="count" id="cApproved">0</span></div>
+      <div class="statusTab" id="sRejected">Rejected <span class="count" id="cRejected">0</span></div>
+    </div>
+
+    <div id="requestsContainer"></div>
+  </section>
+
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+  import {
+    getFirestore, doc, getDoc, collection, getDocs, query, where, updateDoc,
+    serverTimestamp, setDoc
+  } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDgoq2rMU5kiKcz_27-hjBzd8rxS8yQqdY",
+    authDomain: "xime-leave-system-b25a4.firebaseapp.com",
+    projectId: "xime-leave-system-b25a4",
+    storageBucket: "xime-leave-system-b25a4.firebasestorage.app",
+    messagingSenderId: "802112635142",
+    appId: "1:802112635142:web:0fd0f5ad1ae3ef8eb4de87"
+  };
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const logoutBtn = document.getElementById("logoutBtn");
+  const tabDashboard = document.getElementById("tabDashboard");
+  const tabRequests  = document.getElementById("tabRequests");
+  const pageDashboard = document.getElementById("pageDashboard");
+  const pageRequests  = document.getElementById("pageRequests");
+
+  // Profile nodes
+  const apName = document.getElementById("apName");
+  const apEmail = document.getElementById("apEmail");
+  const lineWarden = document.getElementById("lineWarden");
+  const apWarden = document.getElementById("apWarden");
+  const lineBC = document.getElementById("lineBC");
+  const apBC = document.getElementById("apBC");
+
+  // Dashboard filters
+  const fType = document.getElementById("fType");
+  const fFrom = document.getElementById("fFrom");
+  const fTo   = document.getElementById("fTo");
+  const applyFilters = document.getElementById("applyFilters");
+
+  // Metrics
+  const mTotal = document.getElementById("mTotal");
+  const mPending = document.getElementById("mPending");
+  const mApproved = document.getElementById("mApproved");
+  const mRejected = document.getElementById("mRejected");
+
+  // Requests filter
+  const reqFilterWrap = document.getElementById("reqFilterWrap");
+  const rFrom = document.getElementById("rFrom");
+  const rTo = document.getElementById("rTo");
+  const applyReqFilters = document.getElementById("applyReqFilters");
+
+  // Tabs
+  const tSingle = document.getElementById("tSingle");
+  const tOne = document.getElementById("tOne");
+  const tExtended = document.getElementById("tExtended");
+
+  const sPending = document.getElementById("sPending");
+  const sApproved = document.getElementById("sApproved");
+  const sRejected = document.getElementById("sRejected");
+
+  const cPending = document.getElementById("cPending");
+  const cApproved = document.getElementById("cApproved");
+  const cRejected = document.getElementById("cRejected");
+
+  const requestsContainer = document.getElementById("requestsContainer");
+
+  let currentUserEmailRaw = "";
+  let currentUserEmailLower = "";
+  let roleDoc = null;
+  let roleType = "approver"; // approver | dean
+
+  let canBC = false;
+  let canWarden = false;
+
+  let activeLeaveType = "single";
+  let activeStatus = "pending";
+
+  let dashType = "all";
+  let dashFrom = "";
+  let dashTo = "";
+
+  let reqFrom = "";
+  let reqTo = "";
+
+  let cacheAllForApprover = [];
+
+  const rosterPhotoCache = new Map();
+  const IMG_PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+
+  function isoNow(){ return new Date().toISOString(); }
+  function normalizeEmail(v){ return String(v || "").trim().toLowerCase(); }
+  function normalizeRollno(v){ return String(v || "").trim().toUpperCase(); }
+
+  // Your expected mapping
+  const YEAR_TO_BATCH = { "1":"Batch 9", "2":"Batch 8" };
+
+  function showPage(which){
+    tabDashboard.classList.remove("active");
+    tabRequests.classList.remove("active");
+    pageDashboard.classList.add("hidden");
+    pageRequests.classList.add("hidden");
+
+    if(which === "dashboard"){
+      tabDashboard.classList.add("active");
+      pageDashboard.classList.remove("hidden");
+    }else{
+      tabRequests.classList.add("active");
+      pageRequests.classList.remove("hidden");
+      updateReqFilterVisibility();
+    }
+  }
+
+  function toStartOfDayISO(dateStr){ return dateStr ? `${dateStr}T00:00` : ""; }
+  function toEndOfDayISO(dateStr){ return dateStr ? `${dateStr}T23:59` : ""; }
+
+  function getOutDT(row){ return row.out_datetime || row.outDT || row.outDateTime || ""; }
+  function getInDT(row){ return row.in_datetime || row.inDT || row.inDateTime || ""; }
+
+  function inDateRangeOutDT(row, fromDate, toDate){
+    const outDT = getOutDT(row);
+    if (!outDT) return false;
+    const out = String(outDT);
+    if (fromDate){
+      const fromISO = toStartOfDayISO(fromDate);
+      if (out < fromISO) return false;
+    }
+    if (toDate){
+      const toISO = toEndOfDayISO(toDate);
+      if (out > toISO) return false;
+    }
+    return true;
+  }
+
+  function fmtDT(iso){
+    const dt = new Date(iso);
+    if (isNaN(dt)) return "-";
+    const dd = String(dt.getDate()).padStart(2,"0");
+    const mm = String(dt.getMonth()+1).padStart(2,"0");
+    const yyyy = dt.getFullYear();
+    let hh = dt.getHours();
+    const min = String(dt.getMinutes()).padStart(2,"0");
+    const ampm = hh >= 12 ? "PM" : "AM";
+    hh = hh % 12; hh = hh ? hh : 12;
+    hh = String(hh).padStart(2,"0");
+    return `${dd}/${mm}/${yyyy} ${hh}:${min} ${ampm}`;
+  }
+
+  function initials(name){
+    const n = String(name || "").trim();
+    if (!n) return "ST";
+    const parts = n.split(/\s+/).filter(Boolean);
+    const a = parts[0]?.[0] || "S";
+    const b = parts.length > 1 ? (parts[parts.length-1]?.[0] || "") : (parts[0]?.[1] || "");
+    return (a + b).toUpperCase();
+  }
+
+  function setLeaveTypeTab(type){
+    activeLeaveType = type;
+    [tSingle,tOne,tExtended].forEach(x => x.classList.remove("active"));
+    if (type === "single") tSingle.classList.add("active");
+    if (type === "one") tOne.classList.add("active");
+    if (type === "extended") tExtended.classList.add("active");
+  }
+
+  function setStatusTab(status){
+    activeStatus = status;
+    [sPending,sApproved,sRejected].forEach(x => x.classList.remove("active"));
+    if (status === "pending") sPending.classList.add("active");
+    if (status === "approved") sApproved.classList.add("active");
+    if (status === "rejected") sRejected.classList.add("active");
+    updateReqFilterVisibility();
+  }
+
+  function updateReqFilterVisibility(){
+    if (activeStatus === "pending") reqFilterWrap.classList.add("hidden");
+    else reqFilterWrap.classList.remove("hidden");
+  }
+
+  function chainEntryForMe(chain){
+    const meLower = currentUserEmailLower;
+    const meRaw = currentUserEmailRaw;
+    const arr = Array.isArray(chain) ? chain : [];
+    return arr.find(x => {
+      const e = String(x?.email || "").trim();
+      return e === meRaw || e.toLowerCase() === meLower;
+    }) || null;
+  }
+
+  function nextHolderEmail(chain){
+    const arr = Array.isArray(chain) ? chain : [];
+    const pending = arr.find(x => String(x?.status || x?.action || "").toLowerCase() === "pending");
+    return pending ? normalizeEmail(pending.email) : null;
+  }
+
+  function ensureApproverEmailsFromChain(chain){
+    const arr = Array.isArray(chain) ? chain : [];
+    return arr.map(x => normalizeEmail(x?.email)).filter(Boolean);
+  }
+
+  function computeCapabilitiesFromRoleDoc(d){
+    const bcYears = Array.isArray(d?.bc_years) ? d.bc_years.map(x => String(x)) : [];
+    const wardenHostels = Array.isArray(d?.warden_hostels) ? d.warden_hostels.map(x => String(x).toLowerCase()) : [];
+
+    canBC = bcYears.some(y => y === "1" || y === "2");
+    canWarden = wardenHostels.length > 0;
+
+    return { bcYears, wardenHostels };
+  }
+
+  function updateApproverUI(){
+    const name = String(roleDoc?.name || "").trim() || "Approver";
+    apName.textContent = name;
+    apEmail.textContent = currentUserEmailRaw;
+
+    const { bcYears, wardenHostels } = computeCapabilitiesFromRoleDoc(roleDoc);
+
+    if (wardenHostels.length){
+      lineWarden.style.display = "block";
+      const pretty = wardenHostels.map(h => {
+        if (h === "boys") return "Boys Hostel";
+        if (h === "girls") return "Girls Hostel";
+        if (h === "guest_house" || h === "guesthouse") return "Guest House";
+        return h;
+      }).join(", ");
+      apWarden.textContent = pretty;
+    } else {
+      lineWarden.style.display = "none";
+    }
+
+    if (bcYears.some(y => y === "1" || y === "2")){
+      lineBC.style.display = "block";
+      const batches = bcYears
+        .filter(y => y === "1" || y === "2")
+        .map(y => YEAR_TO_BATCH[y] || `Year ${y}`)
+        .join(", ");
+      apBC.textContent = batches;
+    } else {
+      lineBC.style.display = "none";
+    }
+  }
+
+  function applyRoleBasedVisibility(){
+    if (!canBC){
+      tSingle.classList.add("hidden");
+      if (activeLeaveType === "single"){
+        setLeaveTypeTab("one");
+      }
+    } else {
+      tSingle.classList.remove("hidden");
+    }
+  }
+
+  async function loadRoleDoc(){
+    const refAdminLower = doc(db, "admins", currentUserEmailLower);
+    const snapAdminLower = await getDoc(refAdminLower);
+    if (snapAdminLower.exists()){
+      roleType = "dean";
+      return snapAdminLower.data();
+    }
+
+    const refAdminRaw = doc(db, "admins", currentUserEmailRaw);
+    const snapAdminRaw = await getDoc(refAdminRaw);
+    if (snapAdminRaw.exists()){
+      roleType = "dean";
+      return snapAdminRaw.data();
+    }
+
+    const refLower = doc(db, "approvers", currentUserEmailLower);
+    const snapLower = await getDoc(refLower);
+    if (snapLower.exists()){
+      roleType = "approver";
+      return snapLower.data();
+    }
+
+    const refRaw = doc(db, "approvers", currentUserEmailRaw);
+    const snapRaw = await getDoc(refRaw);
+    if (snapRaw.exists()){
+      roleType = "approver";
+      return snapRaw.data();
+    }
+
+    throw new Error("Access denied. You are not assigned as Batch Coordinator or Warden.");
+  }
+
+  async function tryGetDocs(qLower, qRaw){
+    try{
+      const snap = await getDocs(qLower);
+      return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    }catch(e){
+      const snap2 = await getDocs(qRaw);
+      return snap2.docs.map(d => ({ id: d.id, ...d.data() }));
+    }
+  }
+
+  async function refreshCache(){
+    const meLower = currentUserEmailLower;
+    const meRaw = currentUserEmailRaw;
+
+    const qPendingLower = query(collection(db, "leave_requests"),
+      where("current_holder_email", "==", meLower),
+      where("status", "==", "pending")
+    );
+    const qPendingRaw = query(collection(db, "leave_requests"),
+      where("current_holder_email", "==", meRaw),
+      where("status", "==", "pending")
+    );
+    const pendingRows = await tryGetDocs(qPendingLower, qPendingRaw);
+
+    const qMineLower = query(collection(db, "leave_requests"),
+      where("approver_emails", "array-contains", meLower)
+    );
+    const qMineRaw = query(collection(db, "leave_requests"),
+      where("approver_emails", "array-contains", meRaw)
+    );
+
+    let mineAll = [];
+    try { mineAll = await tryGetDocs(qMineLower, qMineRaw); }
+    catch(e){ mineAll = []; }
+
+    const actedByMeRows = mineAll.filter(r => {
+      const entry = chainEntryForMe(r.approver_chain);
+      if (!entry) return false;
+      const mySt = String(entry.status || entry.action || "").toLowerCase();
+      return mySt === "approved" || mySt === "rejected";
+    });
+
+    const map = new Map();
+    [...pendingRows, ...actedByMeRows].forEach(r => map.set(r.id, r));
+    cacheAllForApprover = [...map.values()];
+  }
+
+  function computeDashboardMetrics(){
+    const meLower = currentUserEmailLower;
+    const meRaw = currentUserEmailRaw;
+
+    const rows = cacheAllForApprover.filter(r => {
+      if (dashType !== "all" && String(r.leave_type||"") !== dashType) return false;
+      if (!inDateRangeOutDT(r, dashFrom, dashTo)) return false;
+      return true;
+    });
+
+    const total = rows.length;
+
+    const pending = rows.filter(r => {
+      const holder = String(r.current_holder_email || "").trim();
+      const holderOk = holder === meRaw || holder.toLowerCase() === meLower;
+      return holderOk && String(r.status || "").toLowerCase() === "pending";
+    }).length;
+
+    const approved = rows.filter(r => {
+      const e = chainEntryForMe(r.approver_chain);
+      return e && String(e.status || e.action || "").toLowerCase() === "approved";
+    }).length;
+
+    const rejected = rows.filter(r => {
+      const e = chainEntryForMe(r.approver_chain);
+      return e && String(e.status || e.action || "").toLowerCase() === "rejected";
+    }).length;
+
+    mTotal.textContent = String(total);
+    mPending.textContent = String(pending);
+    mApproved.textContent = String(approved);
+    mRejected.textContent = String(rejected);
+  }
+
+  function filteredForRequests(){
+    const meLower = currentUserEmailLower;
+    const meRaw = currentUserEmailRaw;
+
+    return cacheAllForApprover.filter(r => {
+      if (String(r.leave_type || "") !== activeLeaveType) return false;
+
+      if (activeStatus !== "pending"){
+        if (!inDateRangeOutDT(r, reqFrom, reqTo)) return false;
+      }
+
+      if (activeStatus === "pending"){
+        const holder = String(r.current_holder_email || "").trim();
+        const holderOk = holder === meRaw || holder.toLowerCase() === meLower;
+        return holderOk && String(r.status || "").toLowerCase() === "pending";
+      }
+
+      const entry = chainEntryForMe(r.approver_chain);
+      if (!entry) return false;
+      return String(entry.status || entry.action || "").toLowerCase() === activeStatus;
+    });
+  }
+
+  function updateStatusCounts(){
+    const meLower = currentUserEmailLower;
+    const meRaw = currentUserEmailRaw;
+
+    const base = cacheAllForApprover.filter(r => String(r.leave_type || "") === activeLeaveType);
+
+    const pending = base.filter(r => {
+      const holder = String(r.current_holder_email || "").trim();
+      const holderOk = holder === meRaw || holder.toLowerCase() === meLower;
+      return holderOk && String(r.status || "").toLowerCase() === "pending";
+    }).length;
+
+    const approved = base.filter(r => {
+      if (!inDateRangeOutDT(r, reqFrom, reqTo)) return false;
+      const e = chainEntryForMe(r.approver_chain);
+      return e && String(e.status || e.action || "").toLowerCase() === "approved";
+    }).length;
+
+    const rejected = base.filter(r => {
+      if (!inDateRangeOutDT(r, reqFrom, reqTo)) return false;
+      const e = chainEntryForMe(r.approver_chain);
+      return e && String(e.status || e.action || "").toLowerCase() === "rejected";
+    }).length;
+
+    cPending.textContent = String(pending);
+    cApproved.textContent = String(approved);
+    cRejected.textContent = String(rejected);
+  }
+
+  function extractDriveId(url){
+    const u = String(url || "").trim();
+    if (!u) return "";
+    const m1 = u.match(/drive\.google\.com\/file\/d\/([^\/]+)\//);
+    if (m1 && m1[1]) return m1[1];
+    const m2 = u.match(/[?&]id=([^&]+)/);
+    if (m2 && m2[1]) return m2[1];
+    const m3 = u.match(/uc\?export=view&id=([^&]+)/);
+    if (m3 && m3[1]) return m3[1];
+    return "";
+  }
+  function resolveDriveUrls(rawLink){
+    const id = extractDriveId(rawLink);
+    if (!id) return { primary: rawLink, fallback: "" };
+    const primary = `https://lh3.googleusercontent.com/d/${id}=w1000`;
+    const fallback = `https://drive.google.com/uc?export=view&id=${id}`;
+    return { primary, fallback };
+  }
+
+  function resolvePhotoURL(obj){
+    const raw =
+      obj?.photo_url ||
+      obj?.photoUrl ||
+      obj?.photoURL ||
+      obj?.photo ||
+      obj?.photoLink ||
+      obj?.imageUrl ||
+      obj?.imageURL ||
+      obj?.student_photo_url ||
+      "";
+
+    const link = String(raw || "").trim();
+    if (!link) return { primary:"", fallback:"" };
+
+    if (link.includes("drive.google.com") || link.includes("googleusercontent.com")){
+      return resolveDriveUrls(link);
+    }
+    if (link.startsWith("http://") || link.startsWith("https://")){
+      return { primary: link, fallback: "" };
+    }
+    return { primary:"", fallback:"" };
+  }
+
+  async function getRosterPhotoResolved(rollno){
+    const roll = normalizeRollno(rollno);
+    if (!roll) return { primary:"", fallback:"" };
+    if (rosterPhotoCache.has(roll)) return rosterPhotoCache.get(roll);
+
+    try{
+      const snap = await getDoc(doc(db, "students_roster", roll));
+      if (!snap.exists()){
+        const empty = { primary:"", fallback:"" };
+        rosterPhotoCache.set(roll, empty);
+        return empty;
+      }
+      const resolved = resolvePhotoURL(snap.data());
+      rosterPhotoCache.set(roll, resolved);
+      return resolved;
+    }catch(e){
+      const empty = { primary:"", fallback:"" };
+      rosterPhotoCache.set(roll, empty);
+      return empty;
+    }
+  }
+
+  async function hydrateStudentPhoto(cardEl, rollno, studentName, requestRow){
+    const img = cardEl.querySelector("img.studentPhoto");
+    const av = cardEl.querySelector(".studentAvatar");
+    if (!img || !av) return;
+
+    av.textContent = initials(studentName);
+    av.style.display = "grid";
+    img.style.display = "none";
+
+    let resolved = await getRosterPhotoResolved(rollno);
+    if (!resolved?.primary){
+      resolved = resolvePhotoURL(requestRow || {});
+    }
+    const { primary, fallback } = resolved || {};
+    if (!primary) return;
+
+    let usedFallback = false;
+
+    img.onload = () => { img.style.display = "block"; av.style.display = "none"; };
+    img.onerror = () => {
+      if (!usedFallback && fallback){ usedFallback = true; img.src = fallback; return; }
+      img.style.display = "none"; av.style.display = "grid";
+    };
+
+    img.src = primary;
+  }
+
+  function renderRequests(){
+    const rows = filteredForRequests();
+    rows.sort((a,b) => String(getOutDT(b)||"").localeCompare(String(getOutDT(a)||"")));
+
+    requestsContainer.innerHTML = "";
+
+    if (!rows.length){
+      const empty = document.createElement("div");
+      empty.style.padding = "14px";
+      empty.style.color = "#64748b";
+      empty.style.fontWeight = "850";
+      empty.textContent = "No requests found for the selected filters.";
+      requestsContainer.appendChild(empty);
+      return;
+    }
+
+    rows.forEach(r => {
+      const statusOverall = String(r.status || "pending").toLowerCase();
+      const badgeClass =
+        statusOverall === "approved" ? "approved" :
+        statusOverall === "rejected" ? "rejected" : "pending";
+
+      const studentName = r.student_name || r.student?.name || "—";
+      const roll = normalizeRollno(r.student_rollno || r.student?.rollno || "");
+      const room = r.student_room_no || r.student?.room || r.student?.roomNo || "—";
+      const reason = r.reason || "-";
+
+      const outVal = getOutDT(r);
+      const inVal  = getInDT(r);
+
+      const myEntry = chainEntryForMe(r.approver_chain);
+      const myAction = String(myEntry?.status || myEntry?.action || "").toLowerCase();
+      const forwarded = (myAction === "approved" && statusOverall === "pending");
+
+      const card = document.createElement("section");
+      card.className = "requestCard";
+      const remarkId = `remark_${r.id}`;
+
+      const countLineHTML =
+        (activeStatus === "pending")
+          ? `<div class="reqCountLine">Request #${r.grant_index_in_month || 1} this month</div>`
+          : (forwarded ? `<div class="reqCountLine">✅ You approved • Waiting for next approver</div>` : "");
+
+      card.innerHTML = `
+        <div class="cardTop">
+          <div class="studentBlock">
+            <img class="studentPhoto" src="${IMG_PLACEHOLDER}" alt="Student photo" style="display:none;">
+            <div class="studentAvatar">${initials(studentName)}</div>
+            <div class="studentText">
+              <div class="studentName">${studentName}</div>
+              <div class="studentMeta">${(roll||"—")} • Room ${room}</div>
+              ${countLineHTML}
+            </div>
+          </div>
+          <div class="badge ${badgeClass}">${statusOverall.toUpperCase()}</div>
+        </div>
+
+        <div class="details">
+          <div class="kv"><div class="k">OUT DATE & TIME</div><div class="v">${fmtDT(outVal)}</div></div>
+          <div class="kv"><div class="k">IN DATE & TIME</div><div class="v">${fmtDT(inVal)}</div></div>
+          <div class="kv reasonBox"><div class="k">REASON</div><div class="v">${reason}</div></div>
+        </div>
+
+        <textarea id="${remarkId}" placeholder="Remark (optional)"></textarea>
+
+        <div class="actions">
+          <button class="actionBtn approveBtn" data-id="${r.id}" type="button">Approve</button>
+          <button class="actionBtn rejectBtn" data-id="${r.id}" type="button">Reject</button>
+        </div>
+      `;
+
+      const holder = String(r.current_holder_email || "").trim();
+      const holderOk = holder === currentUserEmailRaw || holder.toLowerCase() === currentUserEmailLower;
+
+      let canAct = false;
+      if (activeStatus === "pending") {
+        canAct = holderOk && statusOverall === "pending";
+      } else if (activeStatus === "rejected") {
+        canAct = statusOverall === "rejected";
+      } else {
+        canAct = false;
+      }
+
+      if (!canAct){
+        card.querySelector(".approveBtn").disabled = true;
+        card.querySelector(".rejectBtn").disabled = true;
+        card.querySelector(`#${remarkId}`).disabled = true;
+      } else {
+        if (activeStatus === "rejected") card.querySelector(".rejectBtn").disabled = true;
+      }
+
+      requestsContainer.appendChild(card);
+      hydrateStudentPhoto(card, roll, studentName, r);
+    });
+
+    requestsContainer.querySelectorAll(".approveBtn").forEach(btn => {
+      btn.addEventListener("click", () => handleApprove(btn.dataset.id));
+    });
+    requestsContainer.querySelectorAll(".rejectBtn").forEach(btn => {
+      btn.addEventListener("click", () => handleReject(btn.dataset.id));
+    });
+  }
+
+  async function handleApprove(requestId){
+    const r = cacheAllForApprover.find(x => x.id === requestId);
+    if (!r) return;
+
+    const statusOverall = String(r.status || "").toLowerCase();
+
+    if (activeStatus === "pending"){
+      const holder = String(r.current_holder_email || "").trim();
+      const holderOk = holder === currentUserEmailRaw || holder.toLowerCase() === currentUserEmailLower;
+      if (!holderOk) return;
+      if (statusOverall !== "pending") return;
+    }
+
+    if (activeStatus === "rejected"){
+      if (statusOverall !== "rejected") return;
+    }
+
+    const remark = (document.getElementById(`remark_${requestId}`)?.value || "").trim();
+    const chain = Array.isArray(r.approver_chain) ? [...r.approver_chain] : [];
+
+    let idx = chain.findIndex(x => {
+      const e = String(x?.email || "").trim();
+      const ok = e === currentUserEmailRaw || e.toLowerCase() === currentUserEmailLower;
+      return ok && String(x?.status || x?.action || "").toLowerCase() === "pending";
+    });
+
+    if (idx === -1){
+      const anyMine = chain.findIndex(x => {
+        const e = String(x?.email || "").trim();
+        return e === currentUserEmailRaw || e.toLowerCase() === currentUserEmailLower;
+      });
+      if (anyMine >= 0) idx = anyMine;
+    }
+
+    if (idx >= 0){
+      chain[idx] = { ...chain[idx], status:"approved", action:"approved", actedAt: isoNow(), acted_at: isoNow(), remark: remark || "" };
+    } else {
+      chain.push({
+        stage: chain.length + 1,
+        email: currentUserEmailLower,
+        role_context: ["approver_override"],
+        status: "approved",
+        action: "approved",
+        actedAt: isoNow(),
+        acted_at: isoNow(),
+        remark: remark || ""
+      });
+    }
+
+    const nextEmail = nextHolderEmail(chain);
+
+    const updates = {
+      approver_chain: chain,
+      approver_emails: ensureApproverEmailsFromChain(chain),
+      updated_at: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    if (nextEmail){
+      updates.current_holder_email = nextEmail;
+      updates.status = "pending";
+    } else {
+      updates.current_holder_email = null;
+      updates.status = "approved";
+      updates.final_approved_by = currentUserEmailLower;
+      updates.final_approved_at = isoNow();
+    }
+
+    try{
+      await updateDoc(doc(db, "leave_requests", requestId), updates);
+      await refreshCache();
+      computeDashboardMetrics();
+      updateStatusCounts();
+      renderRequests();
+    }catch(e){
+      console.error(e);
+      alert("Unable to approve. Check Firestore rules / data.");
+    }
+  }
+
+  async function handleReject(requestId){
+    const r = cacheAllForApprover.find(x => x.id === requestId);
+    if (!r) return;
+
+    const holder = String(r.current_holder_email || "").trim();
+    const holderOk = holder === currentUserEmailRaw || holder.toLowerCase() === currentUserEmailLower;
+    if (!holderOk) return;
+    if (String(r.status || "").toLowerCase() !== "pending") return;
+
+    const remark = (document.getElementById(`remark_${requestId}`)?.value || "").trim();
+    const chain = Array.isArray(r.approver_chain) ? [...r.approver_chain] : [];
+
+    const idx = chain.findIndex(x => {
+      const e = String(x?.email || "").trim();
+      const ok = e === currentUserEmailRaw || e.toLowerCase() === currentUserEmailLower;
+      return ok && String(x?.status || x?.action || "").toLowerCase() === "pending";
+    });
+
+    if (idx === -1){
+      alert("This request is not assigned to you.");
+      return;
+    }
+
+    chain[idx] = { ...chain[idx], status:"rejected", action:"rejected", actedAt: isoNow(), acted_at: isoNow(), remark: remark || "" };
+
+    const updates = {
+      approver_chain: chain,
+      approver_emails: ensureApproverEmailsFromChain(chain),
+      current_holder_email: null,
+      status: "rejected",
+      updated_at: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    try{
+      await updateDoc(doc(db, "leave_requests", requestId), updates);
+      await refreshCache();
+      computeDashboardMetrics();
+      updateStatusCounts();
+      renderRequests();
+    }catch(e){
+      console.error(e);
+      alert("Unable to reject. Check Firestore rules / data.");
+    }
+  }
+
+  logoutBtn.addEventListener("click", async () => {
+    await signOut(auth);
+    // GitHub Pages safe (from /pages/ back to root index)
+    window.location.href = "../index.html";
+  });
+
+  tabDashboard.addEventListener("click", () => showPage("dashboard"));
+  tabRequests.addEventListener("click", () => {
+    showPage("requests");
+    updateStatusCounts();
+    renderRequests();
+  });
+
+  applyFilters.addEventListener("click", async () => {
+    dashType = fType.value || "all";
+    dashFrom = fFrom.value || "";
+    dashTo = fTo.value || "";
+    await refreshCache();
+    computeDashboardMetrics();
+  });
+
+  applyReqFilters.addEventListener("click", () => {
+    reqFrom = rFrom.value || "";
+    reqTo = rTo.value || "";
+    if (activeStatus !== "pending"){
+      updateStatusCounts();
+      renderRequests();
+    }
+  });
+
+  tSingle.addEventListener("click", () => { setLeaveTypeTab("single"); updateStatusCounts(); renderRequests(); });
+  tOne.addEventListener("click", () => { setLeaveTypeTab("one"); updateStatusCounts(); renderRequests(); });
+  tExtended.addEventListener("click", () => { setLeaveTypeTab("extended"); updateStatusCounts(); renderRequests(); });
+
+  sPending.addEventListener("click", () => { setStatusTab("pending"); updateStatusCounts(); renderRequests(); });
+  sApproved.addEventListener("click", () => { setStatusTab("approved"); updateStatusCounts(); renderRequests(); });
+  sRejected.addEventListener("click", () => { setStatusTab("rejected"); updateStatusCounts(); renderRequests(); });
+
+  onAuthStateChanged(auth, async (u) => {
+    if (!u){
+      window.location.href = "../index.html";
+      return;
+    }
+
+    currentUserEmailRaw = String(u.email || "").trim();
+    currentUserEmailLower = currentUserEmailRaw.toLowerCase();
+
+    try{
+      roleDoc = await loadRoleDoc();
+
+      if (roleDoc?.is_active === false){
+        throw new Error("Access denied. Your approver account is inactive.");
+      }
+
+      computeCapabilitiesFromRoleDoc(roleDoc);
+      if (!canBC && !canWarden){
+        throw new Error("Access denied. You are not assigned as Batch Coordinator or Warden.");
+      }
+
+      updateApproverUI();
+      applyRoleBasedVisibility();
+
+      showPage("dashboard");
+
+      setLeaveTypeTab(canBC ? "single" : "one");
+      setStatusTab("pending");
+
+      await refreshCache();
+      computeDashboardMetrics();
+      updateStatusCounts();
+      renderRequests();
+    }catch(err){
+      console.error(err);
+      alert(err?.message || "Unable to load approver role/data. Contact Admin.");
+      await signOut(auth);
+      window.location.href = "../index.html";
+    }
+  });
+</script>
+</body>
+</html>

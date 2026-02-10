@@ -1,0 +1,1272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>XIME — Student Dashboard</title>
+
+  <style>
+    :root{
+      --red:#c1121f;
+      --redDark:#9b0f19;
+
+      --bg:#fbfbfc;
+      --card:#ffffff;
+      --ink:#111827;
+      --muted:#6b7280;
+
+      --line:#e5e7eb;
+      --soft:#f6f7f9;
+
+      --good:#0f766e;
+      --bad:#b42318;
+      --warn:#b54708;
+
+      --shadow: 0 10px 24px rgba(17,24,39,.08);
+      --radius: 16px;
+
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family:var(--font);
+      color:var(--ink);
+      background:
+        radial-gradient(1000px 520px at 20% 0%, rgba(193,18,31,.06), transparent 55%),
+        radial-gradient(900px 500px at 90% 10%, rgba(193,18,31,.05), transparent 55%),
+        linear-gradient(180deg, #fff 0%, #fff 45%, var(--bg) 100%);
+      min-height:100vh;
+    }
+
+    /* ===== Topbar ===== */
+    .topbar{
+      position:sticky;
+      top:0;
+      z-index:50;
+      background: rgba(255,255,255,.86);
+      backdrop-filter: blur(12px);
+      border-bottom:1px solid var(--line);
+    }
+    .topbarInner{
+      max-width:1120px;
+      margin:0 auto;
+      padding:12px 16px;
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+    }
+
+    .brand{
+      display:flex;
+      align-items:center;
+      gap:12px;
+      min-width:0;
+    }
+    .brand img{
+      width:96px;
+      max-height:48px;
+      height:auto;
+      object-fit:contain;
+      display:block;
+    }
+    .brandText{
+      display:flex;
+      flex-direction:column;
+      line-height:1.15;
+      min-width:0;
+    }
+    .brandText .inst{
+      font-size:14px;
+      font-weight:800;
+      color:var(--ink);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:520px;
+    }
+    .brandText .sys{
+      font-size:16px;
+      font-weight:800;
+      color:var(--red);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:520px;
+    }
+
+    .actions{
+      display:flex;
+      align-items:center;
+      gap:10px;
+      flex-shrink:0;
+    }
+
+    .btn{
+      border:none;
+      border-radius:12px;
+      padding:10px 12px;
+      cursor:pointer;
+      font-weight:800;
+      color:#fff;
+      background: linear-gradient(135deg, var(--red), #ff3b3b);
+      box-shadow: 0 10px 20px rgba(193,18,31,.14);
+      transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease;
+      font-size:13px;
+      line-height:1;
+      user-select:none;
+    }
+    .btn:hover{ transform: translateY(-1px); }
+    .btn:active{ transform: translateY(0px); opacity:.92; }
+    .btn:disabled{ opacity:.6; cursor:not-allowed; transform:none; }
+
+    .btn.secondary{
+      background:#fff;
+      color:var(--ink);
+      border:1px solid var(--line);
+      box-shadow:none;
+    }
+    .btn.secondary:hover{ border-color: rgba(193,18,31,.35); }
+
+    /* ===== Layout ===== */
+    .wrap{
+      max-width:1120px;
+      margin:0 auto;
+      padding:16px 16px 28px;
+    }
+
+    .pageTitleRow{
+      display:flex;
+      align-items:flex-end;
+      justify-content:space-between;
+      gap:12px;
+      margin-bottom:14px;
+    }
+    .pageTitle{
+      margin:0;
+      font-size:18px;
+      font-weight:850;
+      color:var(--ink);
+    }
+    .subTitle{
+      margin:4px 0 0;
+      font-size:12.5px;
+      color:var(--muted);
+      font-weight:650;
+    }
+
+    /* ===== Tabs ===== */
+    .mainTabs{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      margin:14px 0 14px;
+    }
+    .mainTab{
+      border:1px solid var(--line);
+      background:#fff;
+      padding:10px 12px;
+      border-radius:999px;
+      cursor:pointer;
+      font-weight:800;
+      font-size:13px;
+      color:var(--ink);
+      transition:.12s ease;
+      min-width: 140px;
+      user-select:none;
+    }
+    .mainTab:hover{ border-color: rgba(193,18,31,.35); transform: translateY(-1px); }
+    .mainTab.active{
+      border-color: rgba(193,18,31,.55);
+      background: rgba(193,18,31,.06);
+      color: var(--redDark);
+      box-shadow: 0 10px 18px rgba(193,18,31,.08);
+    }
+
+    /* ===== Card ===== */
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .cardHead{
+      padding:14px 16px;
+      border-bottom:1px solid var(--line);
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:10px;
+      background: linear-gradient(180deg, rgba(193,18,31,.045) 0%, rgba(255,255,255,1) 70%);
+    }
+    .cardTitle{
+      margin:0;
+      font-size:15px;
+      font-weight:850;
+      color:var(--ink);
+    }
+    .cardBody{ padding:14px 16px 16px; }
+    .hidden{ display:none !important; }
+
+    /* ===== Profile ===== */
+    .profileRow{
+      display:grid;
+      grid-template-columns: 200px 1fr;
+      gap:14px;
+      align-items:start;
+    }
+    @media (max-width: 820px){
+      .profileRow{ grid-template-columns: 1fr; }
+      .brandText .inst, .brandText .sys{ max-width: 240px; }
+    }
+
+    .photoBox{
+      border:1px solid var(--line);
+      border-radius:16px;
+      background: var(--soft);
+      padding:12px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      align-items:center;
+      justify-content:center;
+      min-height:260px;
+    }
+
+    .avatar{
+      width:170px;
+      height:220px;
+      border-radius:18px;
+      border:1px solid var(--line);
+      background:#fff;
+      object-fit:cover;
+      display:none;
+    }
+
+    .avatarPlaceholder{
+      width:170px;
+      height:220px;
+      border-radius:18px;
+      border:1px dashed rgba(193,18,31,.35);
+      background: rgba(193,18,31,.05);
+      display:grid;
+      place-items:center;
+      color:var(--redDark);
+      font-weight:850;
+      font-size:14px;
+      text-align:center;
+      padding:12px;
+    }
+    .photoHint{
+      font-size:11px;
+      color:var(--muted);
+      font-weight:650;
+      text-align:center;
+      line-height:1.35;
+    }
+
+    .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    @media (max-width: 560px){ .grid2{ grid-template-columns:1fr; } }
+
+    .kv{
+      border:1px solid var(--line);
+      background: #fff;
+      border-radius:14px;
+      padding:10px 12px;
+    }
+    .kv .k{
+      font-size:11px;
+      color:var(--muted);
+      font-weight:750;
+      letter-spacing:.2px;
+      margin-bottom:4px;
+    }
+    .kv .v{
+      font-size:13.5px;
+      font-weight:750;
+      color:var(--ink);
+      word-break:break-word;
+    }
+
+    /* ===== Form ===== */
+    .row2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    @media (max-width: 700px){ .row2{ grid-template-columns:1fr; } }
+
+    .field{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
+    label{ font-size:12px; color:var(--muted); font-weight:750; }
+    input, textarea{
+      border:1px solid var(--line);
+      background:#fff;
+      color:var(--ink);
+      padding:11px 12px;
+      border-radius:14px;
+      outline:none;
+      font-size:14px;
+      transition:.12s ease;
+      font-family:var(--font);
+    }
+    textarea{ min-height:92px; resize:vertical; }
+    input:focus, textarea:focus{
+      border-color: rgba(193,18,31,.55);
+      box-shadow: 0 0 0 4px rgba(193,18,31,.10);
+    }
+
+    .typeBadge{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      border-radius:999px;
+      padding:7px 10px;
+      border:1px solid rgba(193,18,31,.18);
+      background: rgba(193,18,31,.06);
+      font-size:12px;
+      font-weight:800;
+      color:var(--redDark);
+      white-space:nowrap;
+      height: fit-content;
+    }
+
+    /* ===== History Tabs ===== */
+    .tabs{ display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
+    .tab{
+      border:1px solid var(--line);
+      background:#fff;
+      padding:10px 12px;
+      border-radius:999px;
+      cursor:pointer;
+      font-weight:800;
+      font-size:13px;
+      color:var(--ink);
+      transition:.12s ease;
+      min-width:140px;
+      user-select:none;
+    }
+    .tab:hover{ border-color: rgba(193,18,31,.35); transform: translateY(-1px); }
+    .tab.active{
+      border-color: rgba(193,18,31,.55);
+      background: rgba(193,18,31,.06);
+      color: var(--redDark);
+      box-shadow: 0 10px 18px rgba(193,18,31,.08);
+    }
+
+    /* ===== History list ===== */
+    .list{ display:flex; flex-direction:column; gap:10px; }
+    .item{
+      border:1px solid var(--line);
+      border-radius:14px;
+      padding:12px;
+      background:#fff;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+    }
+    .itemTop{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:12px;
+    }
+    .left{
+      display:flex;
+      flex-direction:column;
+      gap:6px;
+      min-width:0;
+    }
+    .t{ font-weight:750; font-size:13.5px; color:var(--ink); }
+    .m{ font-size:12.5px; color:var(--muted); font-weight:650; line-height:1.35; }
+
+    .rightCol{
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+      align-items:flex-end;
+      flex-shrink:0;
+    }
+
+    .status{
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:12px;
+      font-weight:800;
+      border:1px solid var(--line);
+      background:var(--soft);
+      white-space:nowrap;
+      height:fit-content;
+    }
+    .status.pending{ color: var(--warn); border-color: rgba(181,71,8,.25); background: rgba(181,71,8,.06); }
+    .status.approved{ color: var(--good); border-color: rgba(15,118,110,.25); background: rgba(15,118,110,.06); }
+    .status.rejected{ color: var(--bad); border-color: rgba(180,35,24,.22); background: rgba(180,35,24,.06); }
+    .status.expired{ color:#374151; border-color: rgba(55,65,81,.25); background: rgba(55,65,81,.06); }
+
+    /* ===== Toast ===== */
+    .toast{
+      margin-top:10px;
+      border-radius:12px;
+      padding:10px 12px;
+      border:1px solid var(--line);
+      background:#fff;
+      display:none;
+      font-size:13px;
+      line-height:1.45;
+      font-weight:650;
+    }
+    .toast.show{ display:block; }
+    .toast.good{ border-color: rgba(15,118,110,.25); background: rgba(15,118,110,.06); color:#0f3d39; }
+    .toast.bad{ border-color: rgba(180,35,24,.22); background: rgba(180,35,24,.06); color:#5a1110; }
+
+    /* ===== Stage-wise ===== */
+    .stageWrap{
+      border:1px dashed rgba(193,18,31,.22);
+      background: rgba(193,18,31,.03);
+      border-radius:14px;
+      padding:10px;
+    }
+    .stageTitle{
+      font-size:12px;
+      font-weight:850;
+      color:var(--redDark);
+      margin-bottom:8px;
+    }
+    .stages{ display:flex; flex-direction:column; gap:8px; }
+    .stageRow{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      padding:8px 10px;
+      border-radius:12px;
+      background:#fff;
+      border:1px solid var(--line);
+    }
+    .stageLeft{ display:flex; flex-direction:column; gap:2px; min-width:0; }
+    .stageName{ font-weight:800; font-size:13px; }
+    .stageMeta{ font-size:11px; color:var(--muted); font-weight:650; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:520px; }
+    .stageBadge{
+      border-radius:999px;
+      padding:6px 10px;
+      font-size:11px;
+      font-weight:850;
+      border:1px solid var(--line);
+      background:var(--soft);
+      white-space:nowrap;
+    }
+    .sb-pending{ color:var(--warn); border-color: rgba(181,71,8,.25); background: rgba(181,71,8,.06); }
+    .sb-approved{ color:var(--good); border-color: rgba(15,118,110,.25); background: rgba(15,118,110,.06); }
+    .sb-rejected{ color:var(--bad); border-color: rgba(180,35,24,.22); background: rgba(180,35,24,.06); }
+
+    /* tiny helper */
+    .muted{ color:var(--muted); font-weight:650; }
+  </style>
+</head>
+
+<body>
+  <div class="topbar">
+    <div class="topbarInner">
+      <div class="brand">
+        <img src="../assets/img/xime-logo.jpg" alt="XIME Logo" />
+        <div class="brandText">
+          <div class="inst">Xavier Institute of Management and Entrepreneurship</div>
+          <div class="sys">Leave Management System</div>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn secondary" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="wrap">
+    <div class="pageTitleRow">
+      <div>
+        <h2 class="pageTitle">Student Dashboard</h2>
+        <div class="subTitle"></div>
+      </div>
+    </div>
+
+    <div class="mainTabs">
+      <button class="mainTab active" id="mainProfile" type="button">Profile</button>
+      <button class="mainTab" id="mainApply" type="button">Apply Leave</button>
+      <button class="mainTab" id="mainHistory" type="button">History</button>
+    </div>
+
+    <!-- PROFILE -->
+    <section class="card" id="secProfile">
+      <div class="cardHead">
+        <h3 class="cardTitle">Profile</h3>
+        <div class="muted" id="profileMeta">—</div>
+      </div>
+      <div class="cardBody">
+        <div class="profileRow">
+          <div class="photoBox">
+            <img id="avatar" class="avatar" alt="Student photo" />
+            <div id="avatarPh" class="avatarPlaceholder">PHOTO</div>
+            <div class="photoHint" id="photoHint">Photo will appear here if available.</div>
+          </div>
+
+          <div class="grid2">
+            <div class="kv"><div class="k">NAME</div><div class="v" id="p_name">—</div></div>
+            <div class="kv"><div class="k">ROLL NO</div><div class="v" id="p_roll">—</div></div>
+            <div class="kv"><div class="k">EMAIL</div><div class="v" id="p_email">—</div></div>
+            <div class="kv"><div class="k">BATCH</div><div class="v" id="p_batch">—</div></div>
+            <div class="kv"><div class="k">YEAR</div><div class="v" id="p_year">—</div></div>
+            <div class="kv"><div class="k">HOSTEL</div><div class="v" id="p_hostel">—</div></div>
+            <div class="kv"><div class="k">ROOM NO</div><div class="v" id="p_room">Not updated</div></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- APPLY -->
+    <section class="card hidden" id="secApply">
+      <div class="cardHead">
+        <h3 class="cardTitle">Apply Leave</h3>
+        <div class="typeBadge" id="typeBadge">Leave Type: —</div>
+      </div>
+
+      <div class="cardBody">
+        <form id="leaveForm">
+          <div class="row2">
+            <div class="field">
+              <label for="outDT">Out Date & Time</label>
+              <input id="outDT" type="datetime-local" required />
+            </div>
+            <div class="field">
+              <label for="inDT">In Date & Time</label>
+              <input id="inDT" type="datetime-local" required />
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="reason">Reason</label>
+            <textarea id="reason" placeholder="Reason for leave" required></textarea>
+          </div>
+
+          <div class="row2">
+            <div class="field">
+              <label for="roomNo">Room Number</label>
+              <input id="roomNo" type="text" placeholder="Room number" required />
+            </div>
+            <div class="field">
+              <label for="phone">Contact Number</label>
+              <input id="phone" type="tel" placeholder="10-digit number" inputmode="numeric" maxlength="10" pattern="\d{10}" required />
+            </div>
+          </div>
+
+          <button class="btn" id="submitLeaveBtn" type="submit">Submit Request</button>
+          <div id="toastLeave" class="toast"></div>
+        </form>
+      </div>
+    </section>
+
+    <!-- HISTORY -->
+    <section class="card hidden" id="secHistory">
+      <div class="cardHead">
+        <h3 class="cardTitle">History</h3>
+        <div class="muted" id="historyMeta">—</div>
+      </div>
+
+      <div class="cardBody">
+        <div class="tabs">
+          <button class="tab active" id="tabSingle" type="button">Single Day</button>
+          <button class="tab" id="tabOne" type="button">One Day</button>
+          <button class="tab" id="tabExtended" type="button">Extended</button>
+        </div>
+
+        <div class="list" id="historyList"></div>
+        <div id="toastHistory" class="toast"></div>
+      </div>
+    </section>
+  </div>
+
+  <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+    import {
+      getFirestore, doc, getDoc, collection, addDoc,
+      query, where, limit, getDocs, serverTimestamp
+    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+    const firebaseConfig = {
+      apiKey: "AIzaSyDgoq2rMU5kiKcz_27-hjBzd8rxS8yQqdY",
+      authDomain: "xime-leave-system-b25a4.firebaseapp.com",
+      projectId: "xime-leave-system-b25a4",
+      storageBucket: "xime-leave-system-b25a4.firebasestorage.app",
+      messagingSenderId: "802112635142",
+      appId: "1:802112635142:web:0fd0f5ad1ae3ef8eb4de87"
+    };
+
+    const APPROVER_NAMES = {
+      "bothichandar@xime.org": "Bothichandar",
+      "arulmary@xime.org": "Arulmary",
+      "snehaprabha@xime.org": "Sneha Prabha",
+      "deanacademicchennai@xime.org": "Dean Academic"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+
+    // ===== DOM =====
+    const logoutBtn = document.getElementById("logoutBtn");
+
+    const mainProfile = document.getElementById("mainProfile");
+    const mainApply = document.getElementById("mainApply");
+    const mainHistory = document.getElementById("mainHistory");
+
+    const secProfile = document.getElementById("secProfile");
+    const secApply = document.getElementById("secApply");
+    const secHistory = document.getElementById("secHistory");
+
+    const profileMeta = document.getElementById("profileMeta");
+    const historyMeta = document.getElementById("historyMeta");
+
+    const p_name = document.getElementById("p_name");
+    const p_roll = document.getElementById("p_roll");
+    const p_email = document.getElementById("p_email");
+    const p_batch = document.getElementById("p_batch");
+    const p_year = document.getElementById("p_year");
+    const p_hostel = document.getElementById("p_hostel");
+    const p_room = document.getElementById("p_room");
+
+    const avatar = document.getElementById("avatar");
+    const avatarPh = document.getElementById("avatarPh");
+    const photoHint = document.getElementById("photoHint");
+
+    const outDT = document.getElementById("outDT");
+    const inDT = document.getElementById("inDT");
+    const reason = document.getElementById("reason");
+    const roomNo = document.getElementById("roomNo");
+    const phone = document.getElementById("phone");
+    const typeBadge = document.getElementById("typeBadge");
+    const leaveForm = document.getElementById("leaveForm");
+    const submitLeaveBtn = document.getElementById("submitLeaveBtn");
+    const toastLeave = document.getElementById("toastLeave");
+
+    const tabSingle = document.getElementById("tabSingle");
+    const tabOne = document.getElementById("tabOne");
+    const tabExtended = document.getElementById("tabExtended");
+    const historyList = document.getElementById("historyList");
+    const toastHistory = document.getElementById("toastHistory");
+
+    // ===== Helpers =====
+    function showToast(el, msg, type="good"){
+      el.className = "toast show " + (type === "bad" ? "bad" : "good");
+      el.textContent = msg;
+    }
+    function clearToast(el){ el.className = "toast"; el.textContent = ""; }
+    function normalizeRoll(v){ return String(v || "").trim().toUpperCase(); }
+    function normalizeEmail(v){ return String(v || "").trim().toLowerCase(); }
+
+    function toJSDate(x){
+      if (!x) return null;
+      if (x instanceof Date) return x;
+      if (typeof x?.toDate === "function") return x.toDate();
+      if (typeof x?.toMillis === "function") return new Date(x.toMillis());
+      const d = new Date(x);
+      return isNaN(d) ? null : d;
+    }
+
+    function fmtDT(d){
+      const dt = toJSDate(d);
+      if (!dt) return "-";
+      const dd = String(dt.getDate()).padStart(2, "0");
+      const mm = String(dt.getMonth() + 1).padStart(2, "0");
+      const yyyy = dt.getFullYear();
+      let hh = dt.getHours();
+      const min = String(dt.getMinutes()).padStart(2, "0");
+      const ampm = hh >= 12 ? "PM" : "AM";
+      hh = hh % 12; hh = hh ? hh : 12;
+      hh = String(hh).padStart(2, "0");
+      return `${dd}/${mm}/${yyyy}  ${hh}:${min} ${ampm}`;
+    }
+
+    function detectLeaveType(outISO, inISO){
+      const out = new Date(outISO);
+      const inn = new Date(inISO);
+      if (isNaN(out) || isNaN(inn) || inn <= out) return null;
+      if (out.toDateString() === inn.toDateString()) return "single_day";
+      const outMid = new Date(out.getFullYear(), out.getMonth(), out.getDate());
+      const inMid  = new Date(inn.getFullYear(), inn.getMonth(), inn.getDate());
+      const diffDays = Math.round((inMid - outMid) / (1000*60*60*24));
+      if (diffDays === 1) return "one_day";
+      return "extended_leave";
+    }
+
+    function typeLabel(t){
+      if (t === "single_day") return "Single Day";
+      if (t === "one_day") return "One Day";
+      if (t === "extended_leave") return "Extended";
+      return "—";
+    }
+
+    function updateTypeBadge(){
+      const t = detectLeaveType(outDT.value, inDT.value);
+      typeBadge.textContent = "Leave Type: " + typeLabel(t);
+    }
+    outDT.addEventListener("change", updateTypeBadge);
+    inDT.addEventListener("change", updateTypeBadge);
+
+    phone.addEventListener("input", () => {
+      phone.value = phone.value.replace(/\D/g, "").slice(0, 10);
+    });
+
+    function setMainTab(which){
+      [mainProfile, mainApply, mainHistory].forEach(x => x.classList.remove("active"));
+      [secProfile, secApply, secHistory].forEach(x => x.classList.add("hidden"));
+      if (which === "profile"){ mainProfile.classList.add("active"); secProfile.classList.remove("hidden"); }
+      if (which === "apply"){ mainApply.classList.add("active"); secApply.classList.remove("hidden"); }
+      if (which === "history"){ mainHistory.classList.add("active"); secHistory.classList.remove("hidden"); }
+    }
+
+    mainProfile.addEventListener("click", () => setMainTab("profile"));
+    mainApply.addEventListener("click", () => setMainTab("apply"));
+
+    logoutBtn.addEventListener("click", async () => {
+      await signOut(auth);
+      window.location.href = "../index.html";
+    });
+
+    // ===== Photo handling (same logic you had, kept stable) =====
+    function extractDriveId(url){
+      const u = String(url || "").trim();
+      if (!u) return "";
+      const m1 = u.match(/drive\.google\.com\/file\/d\/([^\/]+)\//);
+      if (m1 && m1[1]) return m1[1];
+      const m2 = u.match(/[?&]id=([^&]+)/);
+      if (m2 && m2[1]) return m2[1];
+      const m3 = u.match(/uc\?export=view&id=([^&]+)/);
+      if (m3 && m3[1]) return m3[1];
+      return "";
+    }
+    function resolveDriveUrls(rawLink){
+      const id = extractDriveId(rawLink);
+      if (!id) return { primary: rawLink, fallback: "" };
+      return {
+        primary: `https://lh3.googleusercontent.com/d/${id}=w1000`,
+        fallback: `https://drive.google.com/uc?export=view&id=${id}`
+      };
+    }
+    function resolvePhotoURL(studentObj){
+      const raw =
+        studentObj.photo_url || studentObj.photoUrl || studentObj.photoURL ||
+        studentObj.photo || studentObj.photoLink || studentObj.imageUrl || studentObj.imageURL || "";
+      const link = String(raw || "").trim();
+      if (!link) return { primary: "", fallback: "" };
+      if (link.includes("drive.google.com") || link.includes("googleusercontent.com")) return resolveDriveUrls(link);
+      if (link.startsWith("http://") || link.startsWith("https://")) return { primary: link, fallback: "" };
+      return { primary: "", fallback: "" };
+    }
+    function setStudentPhoto(studentObj){
+      const { primary, fallback } = resolvePhotoURL(studentObj);
+
+      avatar.style.display = "none";
+      avatarPh.style.display = "grid";
+
+      if (!primary){
+        photoHint.textContent = "Photo will appear here if available.";
+        return;
+      }
+
+      photoHint.textContent = "Loading photo…";
+      let usedFallback = false;
+
+      avatar.onload = () => {
+        avatar.style.display = "block";
+        avatarPh.style.display = "none";
+        photoHint.textContent = "";
+      };
+
+      avatar.onerror = () => {
+        if (!usedFallback && fallback){
+          usedFallback = true;
+          avatar.src = fallback;
+          return;
+        }
+        avatar.style.display = "none";
+        avatarPh.style.display = "grid";
+        photoHint.textContent = "Photo could not be displayed.";
+      };
+
+      avatar.src = primary;
+    }
+
+    // ===== Data =====
+    let currentUser = null;
+    let student = null;
+    let studentRoll = null;
+    let studentEmailLower = "";
+
+    async function getUserMapping(uid){
+      const snap = await getDoc(doc(db, "users", uid));
+      if (!snap.exists()) throw new Error("User mapping not found. Contact Batch Coordinator.");
+      return snap.data();
+    }
+    async function getRoster(roll){
+      const snap = await getDoc(doc(db, "students_roster", roll));
+      if (!snap.exists()) throw new Error("Roster not found. Contact Batch Coordinator.");
+      return snap.data();
+    }
+
+    async function hasActiveSameTypeRequestByEmail(studentEmail, leaveTypeDB){
+      const q1 = query(
+        collection(db, "leave_requests"),
+        where("student_email", "==", studentEmail),
+        where("leave_type", "==", leaveTypeDB),
+        limit(120)
+      );
+
+      const snap = await getDocs(q1);
+      if (snap.empty) return false;
+
+      const now = new Date();
+      for (const d of snap.docs){
+        const data = d.data();
+        const st = String(data.status || "").toLowerCase();
+        if (st === "pending") return true;
+
+        if (st === "approved"){
+          const inISO = data.in_datetime || data.inDT || "";
+          const inDate = new Date(inISO);
+          if (inISO && !isNaN(inDate) && now <= inDate) return true;
+        }
+      }
+      return false;
+    }
+
+    async function getApprovedCountThisMonthByEmail(studentEmail, leaveTypeDB, monthKey){
+      const q1 = query(
+        // note: still simple query to avoid needing composite indexes
+        collection(db, "leave_requests"),
+        where("student_email", "==", studentEmail),
+        limit(250)
+      );
+      const snap = await getDocs(q1);
+
+      // Filter in-memory (stable + avoids index)
+      let count = 0;
+      snap.forEach(docu => {
+        const r = docu.data() || {};
+        if (String(r.leave_type || "") !== String(leaveTypeDB || "")) return;
+        if (String(r.status || "").toLowerCase() !== "approved") return;
+        if (String(r.month_key || "") !== String(monthKey || "")) return;
+        count++;
+      });
+      return count;
+    }
+
+    // ===== History (lazy-loaded for speed) =====
+    let activeHistoryType = "single_day";
+    let historyLoadedOnce = false;
+
+    function setActiveHistoryTab(which){
+      tabSingle.classList.remove("active");
+      tabOne.classList.remove("active");
+      tabExtended.classList.remove("active");
+      if (which === "single_day") tabSingle.classList.add("active");
+      if (which === "one_day") tabOne.classList.add("active");
+      if (which === "extended_leave") tabExtended.classList.add("active");
+    }
+
+    function normLeaveType(raw){
+      const t = String(raw || "").trim().toLowerCase();
+      if (t === "single") return "single_day";
+      if (t === "one") return "one_day";
+      if (t === "extended") return "extended_leave";
+      return "";
+    }
+
+    function matchHistoryTypeFilter(docLeaveType, selectedTab){
+      return normLeaveType(docLeaveType) === selectedTab;
+    }
+
+    function getOutValue(r){ return r.out_datetime || r.outDT || r.out_datetime_str || ""; }
+    function getInValue(r){ return r.in_datetime || r.inDT || r.in_datetime_str || ""; }
+
+    function getCreatedMillis(r){
+      const c = r.created_at || r.createdAt || r.created_on || r.updated_at || r.updatedAt;
+      if (!c) return 0;
+      if (typeof c.toMillis === "function") return c.toMillis();
+      if (typeof c.toDate === "function") return c.toDate().getTime();
+      const d = new Date(c);
+      return isNaN(d) ? 0 : d.getTime();
+    }
+
+    function computeDisplayStatus(row){
+      const base = String(row.status || "pending").toLowerCase();
+      if (base !== "approved") return base;
+      const inVal = getInValue(row);
+      const inDate = new Date(String(inVal || ""));
+      if (!inVal || isNaN(inDate)) return "approved";
+      return (new Date() > inDate) ? "expired" : "approved";
+    }
+
+    function stageBadgeClass(st){
+      const s = String(st || "").toLowerCase();
+      if (s === "approved") return "stageBadge sb-approved";
+      if (s === "rejected") return "stageBadge sb-rejected";
+      return "stageBadge sb-pending";
+    }
+
+    function stageStatusText(st){
+      const s = String(st || "").toLowerCase();
+      if (s === "approved") return "APPROVED";
+      if (s === "rejected") return "REJECTED";
+      return "PENDING";
+    }
+
+    function roleLabelFromContext(arr){
+      const a = Array.isArray(arr) ? arr : [];
+      if (a.includes("batch_coordinator")) return "Batch Coordinator";
+      if (a.includes("warden")) return "Warden";
+      if (a.includes("dean")) return "Dean";
+      return "Approver";
+    }
+
+    function displayNameForEmail(email){
+      const e = normalizeEmail(email);
+      return APPROVER_NAMES[e] || e || "—";
+    }
+
+    function renderStages(chain){
+      const arr = Array.isArray(chain) ? chain : [];
+      if (!arr.length) return "";
+
+      const rows = arr.map(x => {
+        const email = normalizeEmail(x.email || "");
+        const role = roleLabelFromContext(x.role_context || x.roleContext || []);
+        const st = (x.status || x.action || "pending");
+        const acted = x.actedAt || x.acted_at || "";
+        const remark = x.remark || "";
+        const meta = [role, email, acted ? `• ${acted}` : "", remark ? `• ${remark}` : ""].filter(Boolean).join(" ");
+        return `
+          <div class="stageRow">
+            <div class="stageLeft">
+              <div class="stageName">${displayNameForEmail(email)}</div>
+              <div class="stageMeta">${meta}</div>
+            </div>
+            <div class="${stageBadgeClass(st)}">${stageStatusText(st)}</div>
+          </div>
+        `;
+      }).join("");
+
+      return `
+        <div class="stageWrap">
+          <div class="stageTitle">Approval Status (Stage-wise)</div>
+          <div class="stages">${rows}</div>
+        </div>
+      `;
+    }
+
+    async function loadHistoryByEmail(studentEmail, selectedTabType){
+      clearToast(toastHistory);
+      historyList.innerHTML = "";
+      historyMeta.textContent = "Loading…";
+
+      try{
+        const qMine = query(
+          collection(db, "leave_requests"),
+          where("student_email", "==", studentEmail),
+          limit(250)
+        );
+
+        const snap = await getDocs(qMine);
+        let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        rows = rows.filter(r => matchHistoryTypeFilter(r.leave_type, selectedTabType));
+        rows.sort((a,b) => getCreatedMillis(b) - getCreatedMillis(a));
+
+        if (!rows.length){
+          historyList.innerHTML = `
+            <div class="item">
+              <div class="left">
+                <div class="t">No requests</div>
+                <div class="m">No leave history available.</div>
+              </div>
+            </div>`;
+          historyMeta.textContent = "0 requests";
+          return;
+        }
+
+        const frag = document.createDocumentFragment();
+
+        for (const r of rows){
+          const displayStatus = computeDisplayStatus(r);
+          const badge =
+            displayStatus === "approved" ? "approved" :
+            displayStatus === "rejected" ? "rejected" :
+            displayStatus === "expired" ? "expired" : "pending";
+
+          const outVal = getOutValue(r);
+          const inVal = getInValue(r);
+          const showGateBtn = (displayStatus === "approved") && !!r.id;
+
+          const el = document.createElement("div");
+          el.className = "item";
+          el.innerHTML = `
+            <div class="itemTop">
+              <div class="left">
+                <div class="t">Out: ${fmtDT(outVal)}</div>
+                <div class="t">In: ${fmtDT(inVal)}</div>
+                <div class="m">Reason: ${r.reason || "-"}</div>
+              </div>
+
+              <div class="rightCol">
+                <div class="status ${badge}">${displayStatus.toUpperCase()}</div>
+                ${ showGateBtn ? `<button class="btn secondary" type="button" data-gpid="${r.id}">Gatepass</button>` : `` }
+              </div>
+            </div>
+            ${renderStages(r.approver_chain)}
+          `;
+
+          const btn = el.querySelector('button[data-gpid]');
+          if (btn){
+            btn.addEventListener("click", () => {
+              window.location.href = `./gatepass.html?id=${encodeURIComponent(btn.dataset.gpid)}`;
+            });
+          }
+
+          frag.appendChild(el);
+        }
+
+        historyList.appendChild(frag);
+        historyMeta.textContent = `${rows.length} request(s)`;
+
+      }catch(err){
+        console.error("History error:", err);
+        historyMeta.textContent = "—";
+        showToast(toastHistory, "Unable to load history.", "bad");
+      }
+    }
+
+    tabSingle.addEventListener("click", async () => {
+      activeHistoryType = "single_day";
+      setActiveHistoryTab(activeHistoryType);
+      if (studentEmailLower) await loadHistoryByEmail(studentEmailLower, activeHistoryType);
+    });
+
+    tabOne.addEventListener("click", async () => {
+      activeHistoryType = "one_day";
+      setActiveHistoryTab(activeHistoryType);
+      if (studentEmailLower) await loadHistoryByEmail(studentEmailLower, activeHistoryType);
+    });
+
+    tabExtended.addEventListener("click", async () => {
+      activeHistoryType = "extended_leave";
+      setActiveHistoryTab(activeHistoryType);
+      if (studentEmailLower) await loadHistoryByEmail(studentEmailLower, activeHistoryType);
+    });
+
+    mainHistory.addEventListener("click", async () => {
+      setMainTab("history");
+      setActiveHistoryTab(activeHistoryType);
+
+      // ✅ Lazy load history only when needed (faster initial load)
+      if (studentEmailLower){
+        historyLoadedOnce = true;
+        await loadHistoryByEmail(studentEmailLower, activeHistoryType);
+      }
+    });
+
+    // ===== Approver chain helpers (same as your logic) =====
+    function nextHolderEmail(chain){
+      const arr = Array.isArray(chain) ? chain : [];
+      const p = arr.find(x => String(x.action || x.status || "").toLowerCase() === "pending");
+      return p ? normalizeEmail(p.email) : null;
+    }
+
+    function getBatchCoordinatorEmailByYear(year){
+      const y = Number(year) || 0;
+      if (y === 2) return "bothichandar@xime.org";
+      if (y === 1) return "arulmary@xime.org";
+      return "arulmary@xime.org";
+    }
+
+    function getWardenEmailByHostel(hostel){
+      const h = String(hostel || "").toLowerCase();
+      if (h.includes("boy")) return "bothichandar@xime.org";
+      if (h.includes("girl")) return "snehaprabha@xime.org";
+      if (h.includes("guest")) return "arulmary@xime.org";
+      if (h === "boys") return "bothichandar@xime.org";
+      if (h === "girls") return "snehaprabha@xime.org";
+      if (h === "guest_house") return "arulmary@xime.org";
+      return "";
+    }
+
+    async function buildApproverChain(studentYear, hostel, leaveTypeDB){
+      const chain = [];
+      const bcEmail = getBatchCoordinatorEmailByYear(studentYear);
+
+      chain.push({ stage: 1, role_context:["batch_coordinator"], email: bcEmail, action:"pending", acted_at:"", remark:"" });
+
+      if (leaveTypeDB === "single"){
+        return chain;
+      }
+
+      const wardenEmail = getWardenEmailByHostel(hostel);
+      if (wardenEmail && normalizeEmail(wardenEmail) !== normalizeEmail(bcEmail)){
+        chain.push({ stage: 2, role_context:["warden"], email: wardenEmail, action:"pending", acted_at:"", remark:"" });
+      }
+
+      if (leaveTypeDB === "extended"){
+        chain.push({ stage: chain.length + 1, role_context:["dean"], email:"deanacademicchennai@xime.org", action:"pending", acted_at:"", remark:"" });
+      }
+
+      return chain;
+    }
+
+    // ===== Submit leave =====
+    leaveForm.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      clearToast(toastLeave);
+
+      if (!student || !studentRoll || !studentEmailLower){
+        showToast(toastLeave, "Profile not loaded. Please logout and login again.", "bad");
+        return;
+      }
+
+      const outISO = outDT.value;
+      const inISO  = inDT.value;
+
+      const leaveTypeUI = detectLeaveType(outISO, inISO);
+      if (!leaveTypeUI){
+        showToast(toastLeave, "Invalid Out / In date and time.", "bad");
+        return;
+      }
+
+      const leaveTypeDB =
+        leaveTypeUI === "single_day" ? "single" :
+        leaveTypeUI === "one_day" ? "one" : "extended";
+
+      const reasonVal = reason.value.trim();
+      const roomVal   = roomNo.value.trim();
+      const phoneVal  = phone.value.trim();
+
+      if (!reasonVal || !roomVal || !phoneVal){
+        showToast(toastLeave, "Please fill all fields.", "bad");
+        return;
+      }
+      if (!/^\d{10}$/.test(phoneVal)){
+        showToast(toastLeave, "Contact number must be exactly 10 digits.", "bad");
+        return;
+      }
+
+      submitLeaveBtn.disabled = true;
+
+      try{
+        const blocked = await hasActiveSameTypeRequestByEmail(studentEmailLower, leaveTypeDB);
+        if (blocked){
+          showToast(toastLeave, "Active request of the same type already exists.", "bad");
+          return;
+        }
+
+        const year  = student.year ?? student.year_no ?? student.yearNo ?? "";
+        const hostel  = student.hostel ?? "";
+        const chain = await buildApproverChain(year, hostel, leaveTypeDB);
+
+        const nextHolder = nextHolderEmail(chain);
+        if (!nextHolder) throw new Error("Approver chain misconfigured.");
+
+        const monthKey = outISO.slice(0,7);
+        const approvedBefore = await getApprovedCountThisMonthByEmail(studentEmailLower, leaveTypeDB, monthKey);
+        const grantIndex = approvedBefore + 1;
+
+        const deanIntimationRequired = (leaveTypeDB === "one");
+
+        const payload = {
+          student_rollno: studentRoll,
+          student_name: student.name || "",
+          student_email: studentEmailLower,
+          student_year: Number(year) || year,
+          student_hostel: hostel,
+          student_room_no: roomVal,
+          student_photo_url: student.photo_url || "",
+          approved_before_in_month: approvedBefore,
+          grant_index_in_month: grantIndex,
+          month_key: monthKey,
+
+          leave_type: leaveTypeDB,
+          reason: reasonVal,
+          out_datetime: outISO,
+          in_datetime: inISO,
+          contact_no: phoneVal,
+
+          approver_chain: chain,
+          approver_emails: chain.map(x => normalizeEmail(x.email)),
+          current_holder_email: nextHolder,
+
+          dean_intimation_required: deanIntimationRequired,
+          dean_intimated: false,
+          dean_intimated_at: "",
+          dean_intimated_by: "",
+
+          status: "pending",
+          created_at: serverTimestamp(),
+          updated_at: serverTimestamp()
+        };
+
+        await addDoc(collection(db, "leave_requests"), payload);
+
+        showToast(toastLeave, "Leave request submitted successfully.", "good");
+        leaveForm.reset();
+        updateTypeBadge();
+
+        // optional: if history already opened once, refresh it (nice UX)
+        if (historyLoadedOnce && studentEmailLower){
+          await loadHistoryByEmail(studentEmailLower, activeHistoryType);
+        }
+
+      }catch(err){
+        console.error(err);
+        showToast(toastLeave, err?.message || "Failed to submit request.", "bad");
+      }finally{
+        submitLeaveBtn.disabled = false;
+      }
+    });
+
+    // ===== Auth boot =====
+    onAuthStateChanged(auth, async (u) => {
+      if (!u){
+        window.location.href = "../index.html";
+        return;
+      }
+
+      currentUser = u;
+      studentEmailLower = normalizeEmail(u.email || "");
+
+      try{
+        const map = await getUserMapping(u.uid);
+        studentRoll = normalizeRoll(map.rollno);
+        if (!studentRoll) throw new Error("Roll number not linked. Contact Batch Coordinator.");
+
+        student = await getRoster(studentRoll);
+        setStudentPhoto(student);
+
+        p_name.textContent = student.name || "—";
+        p_roll.textContent = studentRoll;
+        p_email.textContent = u.email || "—";
+        p_batch.textContent = (student.batch_no ?? student.batch ?? student.batchNo ?? "—");
+        p_year.textContent = (student.year ?? student.yearNo ?? student.year_no ?? "—");
+        p_hostel.textContent = (student.hostel ?? "—");
+
+        const room = String(student.room_no ?? student.roomNo ?? student.room ?? "").trim();
+        p_room.textContent = room ? room : "Not updated";
+        if (room) roomNo.value = room;
+
+        profileMeta.textContent = `Logged in as ${studentRoll}`;
+        historyMeta.textContent = "Open History to load requests";
+
+        setMainTab("profile");
+        setActiveHistoryTab(activeHistoryType);
+        updateTypeBadge();
+
+      }catch(err){
+        setMainTab("profile");
+        alert(err?.message || "Failed to load student profile.");
+      }
+    });
+  </script>
+</body>
+</html>

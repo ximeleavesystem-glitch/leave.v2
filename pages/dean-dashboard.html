@@ -1,0 +1,1274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XIME — Dean’s Dashboard</title>
+
+<style>
+:root{
+  --red:#c1121f;
+  --redDark:#9b0f19;
+
+  --bg:#fbfbfc;
+  --ink:#111827;
+  --muted:#6b7280;
+  --line:#e5e7eb;
+  --soft:#f6f7f9;
+  --card:#ffffff;
+
+  --good:#0f766e;
+  --bad:#b42318;
+  --warn:#b54708;
+
+  --shadow: 0 10px 24px rgba(17,24,39,.08);
+  --radius: 16px;
+
+  --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  font-family:var(--font);
+  color:var(--ink);
+  background:
+    radial-gradient(1000px 520px at 20% 0%, rgba(193,18,31,.08), transparent 55%),
+    radial-gradient(900px 500px at 90% 10%, rgba(193,18,31,.06), transparent 55%),
+    linear-gradient(180deg, #fff 0%, #fff 50%, var(--bg) 100%);
+  min-height:100vh;
+}
+
+/* Topbar */
+.topbar{
+  position:sticky; top:0; z-index:50;
+  background: rgba(255,255,255,.86);
+  backdrop-filter: blur(12px);
+  border-bottom:1px solid var(--line);
+}
+.topbarInner{
+  max-width:1200px;
+  margin:auto;
+  padding:12px 16px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+}
+.brand{ display:flex; gap:12px; align-items:center; min-width:0; }
+.brand img{
+  width:96px;
+  max-height:48px;
+  object-fit:contain;
+  display:block;
+}
+.brandText{ line-height:1.15; min-width:0; }
+.brandText .inst{
+  font-size:14px;
+  font-weight:850;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:560px;
+}
+.brandText .sys{
+  font-size:16px;
+  font-weight:850;
+  color:var(--red);
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  max-width:560px;
+}
+
+/* Buttons */
+.btn{
+  padding:10px 14px;
+  border:none;
+  border-radius:12px;
+  font-weight:800;
+  cursor:pointer;
+  color:#fff;
+  background:linear-gradient(135deg,var(--red),#ff3b3b);
+  box-shadow: 0 10px 20px rgba(193,18,31,.14);
+  transition:.12s ease;
+}
+.btn:hover{ transform: translateY(-1px); }
+.btn:active{ transform: translateY(0px); opacity:.92; }
+
+.wrap{ max-width:1200px; margin:auto; padding:16px 16px 26px; }
+
+/* Tabs */
+.tabs{
+  display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px;
+}
+.tab{
+  border:1px solid var(--line);
+  background:#fff;
+  padding:10px 12px;
+  border-radius:999px;
+  cursor:pointer;
+  font-weight:800;
+  font-size:13px;
+  color:#111827;
+  transition:.12s ease;
+  min-width: 190px;
+  text-align:center;
+  user-select:none;
+}
+.tab:hover{ border-color: rgba(193,18,31,.35); transform: translateY(-1px); }
+.tab.active{
+  border-color: rgba(193,18,31,.55);
+  background: rgba(193,18,31,.06);
+  color: var(--redDark);
+  box-shadow: 0 10px 18px rgba(193,18,31,.08);
+}
+
+/* Panel */
+.panel{
+  background:var(--card);
+  border:1px solid var(--line);
+  border-radius:var(--radius);
+  box-shadow:var(--shadow);
+  overflow:hidden;
+}
+.panelHead{
+  padding:14px 16px;
+  border-bottom:1px solid var(--line);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  background: linear-gradient(180deg, rgba(193,18,31,.05), rgba(255,255,255,.0));
+}
+.panelTitle{
+  margin:0;
+  font-size:15px;
+  font-weight:850;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.panelTitle .dot{
+  width:10px; height:10px; border-radius:999px;
+  background: var(--red);
+  box-shadow: 0 0 0 6px rgba(193,18,31,.10);
+}
+.panelBody{ padding:14px 16px 16px; }
+.hidden{ display:none !important; }
+
+.sectionTitle{
+  margin: 10px 0 10px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+}
+.sectionTitle h4{
+  margin:0;
+  font-size:13px;
+  font-weight:850;
+  color: var(--redDark);
+}
+.sectionTitle .hint{
+  font-size:12px;
+  color: var(--muted);
+  font-weight:650;
+}
+
+/* Metrics */
+.metricsWrap{ display:grid; gap:14px; margin-top:6px; }
+.metrics{
+  display:grid;
+  grid-template-columns: repeat(3, minmax(190px, 1fr));
+  gap:12px;
+}
+@media(max-width: 980px){ .metrics{ grid-template-columns: repeat(2, minmax(190px, 1fr)); } }
+@media(max-width: 520px){ .metrics{ grid-template-columns: 1fr; } }
+
+.metric{
+  border:1px solid var(--line);
+  background: #fff;
+  border-radius:14px;
+  padding:14px;
+  box-shadow: 0 8px 18px rgba(17,24,39,.06);
+}
+.metric .k{
+  font-size:11px;
+  color:var(--muted);
+  font-weight:750;
+  letter-spacing:.2px;
+}
+.metric .v{
+  margin-top:8px;
+  font-size:28px;
+  font-weight:900;
+}
+
+/* Pills */
+.pill{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  border-radius:999px;
+  padding:6px 10px;
+  font-size:12px;
+  font-weight:800;
+  border:1px solid var(--line);
+  background:var(--soft);
+  white-space:nowrap;
+}
+.pill.pending{ color: var(--warn); border-color: rgba(181,71,8,.25); background: rgba(181,71,8,.06); }
+.pill.approved{ color: var(--good); border-color: rgba(15,118,110,.25); background: rgba(15,118,110,.06); }
+.pill.rejected{ color: var(--bad); border-color: rgba(180,35,24,.22); background: rgba(180,35,24,.06); }
+
+/* Filters */
+.filters{
+  display:flex;
+  flex-wrap:wrap;
+  gap:10px;
+  margin-bottom:12px;
+  padding:10px;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background: rgba(193,18,31,.03);
+  align-items:center;
+}
+.input, select{
+  border:1px solid var(--line);
+  border-radius:14px;
+  padding:10px 12px;
+  background:#fff;
+  font-weight:750;
+  font-size:13px;
+  outline:none;
+}
+.input:focus, select:focus{
+  border-color: rgba(193,18,31,.60);
+  box-shadow: 0 0 0 4px rgba(193,18,31,.10);
+}
+.applyBtn{
+  padding:10px 14px;
+  border:none;
+  border-radius:14px;
+  font-weight:800;
+  cursor:pointer;
+  color:#fff;
+  background: linear-gradient(135deg, var(--red), #ff3b3b);
+  box-shadow: 0 10px 20px rgba(193,18,31,.12);
+  transition:.12s ease;
+}
+.applyBtn:hover{ transform: translateY(-1px); }
+
+.clearBtn{
+  padding:10px 14px;
+  border:1px solid rgba(193,18,31,.35);
+  border-radius:14px;
+  font-weight:800;
+  cursor:pointer;
+  color:var(--redDark);
+  background:#fff;
+  box-shadow: 0 8px 18px rgba(17,24,39,.06);
+  transition:.12s ease;
+}
+.clearBtn:hover{ transform: translateY(-1px); border-color: rgba(193,18,31,.55); }
+
+/* Request cards */
+.requestCard{
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:16px;
+  box-shadow:var(--shadow);
+  padding:14px;
+  margin-bottom:12px;
+  overflow:hidden;
+}
+.cardTop{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-start;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.studentBlock{ display:flex; gap:12px; align-items:center; min-width:0; }
+
+.studentAvatar{
+  width:74px; height:96px;
+  border-radius:16px;
+  border:1px dashed rgba(193,18,31,.35);
+  background: rgba(193,18,31,.05);
+  display:grid;
+  place-items:center;
+  color:var(--redDark);
+  font-weight:900;
+  letter-spacing:.5px;
+  text-transform:uppercase;
+  overflow:hidden;
+  flex: 0 0 auto;
+}
+.studentAvatar img{
+  width:100%;
+  height:100%;
+  object-fit:cover;
+  display:block;
+}
+.studentText{ min-width:0; }
+.studentName{ font-size:18px; font-weight:900; }
+.studentMeta{ margin-top:4px; font-size:13px; color:var(--muted); font-weight:650; }
+.tagType{
+  margin-top:6px;
+  font-size:12px;
+  font-weight:800;
+  color: var(--redDark);
+  display:inline-flex;
+  gap:8px;
+  align-items:center;
+}
+.tagType .miniDot{
+  width:7px; height:7px; border-radius:999px;
+  background: var(--red);
+  box-shadow: 0 0 0 4px rgba(193,18,31,.10);
+}
+
+.details{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  gap:12px;
+  margin-top:12px;
+}
+@media(max-width:700px){ .details{ grid-template-columns:1fr } }
+
+.kv{
+  background:var(--soft);
+  border-radius:14px;
+  padding:12px;
+  border:1px solid var(--line);
+}
+.kv .k{ font-size:11px; color:var(--muted); font-weight:750; letter-spacing:.2px; }
+.kv .v{ margin-top:6px; font-size:14px; font-weight:800; letter-spacing:.1px; }
+.reasonBox{ grid-column:1/-1; }
+
+textarea{
+  width:100%;
+  margin-top:10px;
+  padding:12px;
+  border-radius:14px;
+  border:1px solid var(--line);
+  font-family:var(--font);
+  font-size:14px;
+  resize:vertical;
+  min-height:84px;
+  outline:none;
+}
+textarea:focus{
+  border-color: rgba(193,18,31,.60);
+  box-shadow: 0 0 0 4px rgba(193,18,31,.10);
+}
+
+.actionsRow{ margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; }
+.actionBtn{
+  border:none;
+  padding:11px 16px;
+  border-radius:14px;
+  font-weight:900;
+  cursor:pointer;
+  transition: .12s ease;
+  box-shadow: 0 10px 20px rgba(17,24,39,.10);
+}
+.actionBtn:hover{ transform: translateY(-1px); }
+.actionBtn:active{ transform: translateY(0px); opacity:.92; }
+
+.approveBtn{ background: linear-gradient(135deg, var(--good), #14b8a6); color:#fff; }
+.rejectBtn{ background: linear-gradient(135deg, var(--bad), #ff3b3b); color:#fff; }
+
+.empty{
+  padding:14px;
+  color:var(--muted);
+  font-weight:750;
+  background: rgba(17,24,39,.02);
+  border:1px dashed var(--line);
+  border-radius:14px;
+}
+</style>
+</head>
+
+<body>
+<div class="topbar">
+  <div class="topbarInner">
+    <div class="brand">
+      <!-- GitHub Pages safe: relative from /pages/ -->
+      <img id="ximeLogo" src="../assets/img/xime-logo.jpg" alt="XIME Logo">
+      <div class="brandText">
+        <div class="inst">Xavier Institute of Management and Entrepreneurship</div>
+        <div class="sys">Dean’s Dashboard</div>
+      </div>
+    </div>
+    <button class="btn" id="logoutBtn" type="button">Logout</button>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="tabs">
+    <div class="tab active" id="tabDash">Dashboard</div>
+    <div class="tab" id="tabApprovals">Extended Approvals</div>
+    <div class="tab" id="tabIntimations">One-Day Intimations</div>
+    <div class="tab" id="tabHistory">History (Extended)</div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <section class="panel" id="pageDash">
+    <div class="panelHead">
+      <h3 class="panelTitle"><span class="dot"></span>Dashboard</h3>
+    </div>
+    <div class="panelBody">
+      <div class="metricsWrap">
+
+        <div class="filters" id="dashFilters">
+          <input class="input" id="dFrom" type="date" title="From date">
+          <input class="input" id="dTo" type="date" title="To date">
+          <button class="applyBtn" id="applyDashBtn" type="button">Apply</button>
+          <button class="clearBtn" id="clearDashBtn" type="button">Clear</button>
+        </div>
+
+        <div class="sectionTitle" style="margin-top:4px;">
+          <h4>Overall Approved Requests</h4>
+          <div class="hint">All students • date filtered</div>
+        </div>
+
+        <div class="metrics">
+          <div class="metric">
+            <div class="k">APPROVED — SINGLE</div>
+            <div class="v" id="mApprovedSingle">0</div>
+          </div>
+          <div class="metric">
+            <div class="k">APPROVED — ONE DAY</div>
+            <div class="v" id="mApprovedOne">0</div>
+          </div>
+          <div class="metric">
+            <div class="k">APPROVED — EXTENDED</div>
+            <div class="v" id="mApprovedExtended">0</div>
+          </div>
+        </div>
+
+        <div class="sectionTitle" style="margin-top:6px;">
+          <h4>Dean Actions</h4>
+          <div class="hint">Your metrics • date filtered</div>
+        </div>
+
+        <div class="metrics">
+          <div class="metric">
+            <div class="k">PENDING WITH DEAN</div>
+            <div class="v" id="mDeanPending">0</div>
+          </div>
+          <div class="metric">
+            <div class="k">APPROVED BY DEAN</div>
+            <div class="v" id="mDeanApproved">0</div>
+          </div>
+          <div class="metric">
+            <div class="k">REJECTED BY DEAN</div>
+            <div class="v" id="mDeanRejected">0</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- EXTENDED APPROVALS -->
+  <section class="panel hidden" id="pageApprovals">
+    <div class="panelHead">
+      <h3 class="panelTitle"><span class="dot"></span>Pending Extended Leave Approvals</h3>
+    </div>
+    <div class="panelBody">
+      <div id="approvalsList"></div>
+    </div>
+  </section>
+
+  <!-- INTIMATIONS -->
+  <section class="panel hidden" id="pageIntimations">
+    <div class="panelHead">
+      <h3 class="panelTitle"><span class="dot"></span>One-Day Leave Intimations</h3>
+    </div>
+    <div class="panelBody">
+      <div class="filters">
+        <input class="input" id="iSearch" placeholder="Search roll/name/email">
+        <select id="iYear">
+          <option value="">Year (All)</option>
+          <option value="1">Year 1</option>
+          <option value="2">Year 2</option>
+        </select>
+        <select id="iHostel">
+          <option value="">Hostel (All)</option>
+          <option value="boys">Boys</option>
+          <option value="girls">Girls</option>
+          <option value="guest_house">Guest House</option>
+        </select>
+        <input class="input" id="iFrom" type="date" title="From date">
+        <input class="input" id="iTo" type="date" title="To date">
+        <button class="applyBtn" id="applyIntBtn" type="button">Apply</button>
+        <button class="clearBtn" id="clearIntBtn" type="button">Clear</button>
+      </div>
+      <div id="intimationList"></div>
+    </div>
+  </section>
+
+  <!-- HISTORY -->
+  <section class="panel hidden" id="pageHistory">
+    <div class="panelHead">
+      <h3 class="panelTitle"><span class="dot"></span>History — Extended</h3>
+    </div>
+    <div class="panelBody">
+      <div class="filters">
+        <input class="input" id="hSearch" placeholder="Search roll/name/email">
+        <select id="hStatus">
+          <option value="">Status (All)</option>
+          <option value="approved">Approved</option>
+          <option value="rejected">Rejected</option>
+        </select>
+        <select id="hYear">
+          <option value="">Year (All)</option>
+          <option value="1">Year 1</option>
+          <option value="2">Year 2</option>
+        </select>
+        <select id="hHostel">
+          <option value="">Hostel (All)</option>
+          <option value="boys">Boys</option>
+          <option value="girls">Girls</option>
+          <option value="guest_house">Guest House</option>
+        </select>
+        <input class="input" id="hFrom" type="date" title="From date">
+        <input class="input" id="hTo" type="date" title="To date">
+        <button class="applyBtn" id="applyHistBtn" type="button">Apply</button>
+        <button class="clearBtn" id="clearHistBtn" type="button">Clear</button>
+      </div>
+      <div id="historyList"></div>
+    </div>
+  </section>
+</div>
+
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+  import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+  import {
+    getFirestore, collection, getDocs, query, where, limit, updateDoc, doc,
+    serverTimestamp, getDoc
+  } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyDgoq2rMU5kiKcz_27-hjBzd8rxS8yQqdY",
+    authDomain: "xime-leave-system-b25a4.firebaseapp.com",
+    projectId: "xime-leave-system-b25a4",
+    storageBucket: "xime-leave-system-b25a4.firebasestorage.app",
+    messagingSenderId: "802112635142",
+    appId: "1:802112635142:web:0fd0f5ad1ae3ef8eb4de87"
+  };
+
+  const DEAN_EMAIL = "deanacademicchennai@xime.org";
+
+  // ✅ GitHub Pages safe logo fallback (same folder strategy)
+  const logo = document.getElementById("ximeLogo");
+  logo.addEventListener("error", () => {
+    if (!logo.dataset.try2){
+      logo.dataset.try2 = "1";
+      // keep fallback relative too
+      logo.src = "../assets/img/xime-logo.jpg";
+      return;
+    }
+    logo.style.display = "none";
+  });
+
+  const app = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+
+  const logoutBtn = document.getElementById("logoutBtn");
+
+  const tabDash = document.getElementById("tabDash");
+  const tabApprovals = document.getElementById("tabApprovals");
+  const tabIntimations = document.getElementById("tabIntimations");
+  const tabHistory = document.getElementById("tabHistory");
+
+  const pageDash = document.getElementById("pageDash");
+  const pageApprovals = document.getElementById("pageApprovals");
+  const pageIntimations = document.getElementById("pageIntimations");
+  const pageHistory = document.getElementById("pageHistory");
+
+  // Dashboard date filter
+  const dFrom = document.getElementById("dFrom");
+  const dTo = document.getElementById("dTo");
+  const applyDashBtn = document.getElementById("applyDashBtn");
+  const clearDashBtn = document.getElementById("clearDashBtn");
+
+  // Overall metrics
+  const mApprovedSingle = document.getElementById("mApprovedSingle");
+  const mApprovedOne = document.getElementById("mApprovedOne");
+  const mApprovedExtended = document.getElementById("mApprovedExtended");
+
+  // Dean metrics
+  const mDeanPending = document.getElementById("mDeanPending");
+  const mDeanApproved = document.getElementById("mDeanApproved");
+  const mDeanRejected = document.getElementById("mDeanRejected");
+
+  const approvalsList = document.getElementById("approvalsList");
+  const intimationList = document.getElementById("intimationList");
+  const historyList = document.getElementById("historyList");
+
+  const iSearch = document.getElementById("iSearch");
+  const iYear = document.getElementById("iYear");
+  const iHostel = document.getElementById("iHostel");
+  const iFrom = document.getElementById("iFrom");
+  const iTo = document.getElementById("iTo");
+  const applyIntBtn = document.getElementById("applyIntBtn");
+  const clearIntBtn = document.getElementById("clearIntBtn");
+
+  const hSearch = document.getElementById("hSearch");
+  const hStatus = document.getElementById("hStatus");
+  const hYear = document.getElementById("hYear");
+  const hHostel = document.getElementById("hHostel");
+  const hFrom = document.getElementById("hFrom");
+  const hTo = document.getElementById("hTo");
+  const applyHistBtn = document.getElementById("applyHistBtn");
+  const clearHistBtn = document.getElementById("clearHistBtn");
+
+  function normalizeEmail(v){ return String(v||"").trim().toLowerCase(); }
+  function isoNow(){ return new Date().toISOString(); }
+
+  // ✅ Drive-photo resolver logic
+  function extractDriveId(url){
+    const u = String(url || "").trim();
+    if (!u) return "";
+    const m1 = u.match(/drive\.google\.com\/file\/d\/([^\/]+)\//);
+    if (m1 && m1[1]) return m1[1];
+    const m2 = u.match(/[?&]id=([^&]+)/);
+    if (m2 && m2[1]) return m2[1];
+    const m3 = u.match(/uc\?export=view&id=([^&]+)/);
+    if (m3 && m3[1]) return m3[1];
+    return "";
+  }
+  function resolveDriveUrls(rawLink){
+    const id = extractDriveId(rawLink);
+    if (!id) return { primary: rawLink, fallback: "" };
+    return {
+      primary: `https://lh3.googleusercontent.com/d/${id}=w1000`,
+      fallback: `https://drive.google.com/uc?export=view&id=${id}`
+    };
+  }
+  function resolvePhotoURL(raw){
+    const link = String(raw || "").trim();
+    if (!link) return { primary:"", fallback:"" };
+    if (link.includes("drive.google.com") || link.includes("googleusercontent.com")) return resolveDriveUrls(link);
+    if (link.startsWith("http://") || link.startsWith("https://")) return { primary: link, fallback:"" };
+    return { primary:"", fallback:"" };
+  }
+
+  function parseISODateOnly(iso){
+    const d = new Date(iso);
+    return isNaN(d) ? null : d;
+  }
+
+  function inDateRange(iso, fromStr, toStr){
+    if (!fromStr && !toStr) return true;
+    const d = parseISODateOnly(iso);
+    if (!d) return false;
+
+    if (fromStr){
+      const f = new Date(fromStr + "T00:00:00");
+      if (d < f) return false;
+    }
+    if (toStr){
+      const t = new Date(toStr + "T23:59:59");
+      if (d > t) return false;
+    }
+    return true;
+  }
+
+  function fmtDT(iso){
+    const dt = new Date(iso);
+    if (isNaN(dt)) return "-";
+    const dd = String(dt.getDate()).padStart(2,"0");
+    const mm = String(dt.getMonth()+1).padStart(2,"0");
+    const yyyy = dt.getFullYear();
+    let hh = dt.getHours();
+    const min = String(dt.getMinutes()).padStart(2,"0");
+    const ampm = hh >= 12 ? "PM" : "AM";
+    hh = hh % 12; hh = hh ? hh : 12;
+    hh = String(hh).padStart(2,"0");
+    return `${dd}/${mm}/${yyyy} ${hh}:${min} ${ampm}`;
+  }
+
+  function initials(name){
+    const n = String(name || "").trim();
+    if (!n) return "ST";
+    const parts = n.split(/\s+/).filter(Boolean);
+    const a = parts[0]?.[0] || "S";
+    const b = parts.length > 1 ? (parts[parts.length-1]?.[0] || "") : (parts[0]?.[1] || "");
+    return (a + b).toUpperCase();
+  }
+
+  function statusPill(status){
+    const s = String(status||"pending").toLowerCase();
+    if (s === "approved") return `<span class="pill approved">APPROVED</span>`;
+    if (s === "rejected") return `<span class="pill rejected">REJECTED</span>`;
+    return `<span class="pill pending">PENDING</span>`;
+  }
+
+  function showPage(which){
+    [tabDash, tabApprovals, tabIntimations, tabHistory].forEach(x => x.classList.remove("active"));
+    [pageDash, pageApprovals, pageIntimations, pageHistory].forEach(x => x.classList.add("hidden"));
+
+    if (which === "dash"){ tabDash.classList.add("active"); pageDash.classList.remove("hidden"); }
+    if (which === "approvals"){ tabApprovals.classList.add("active"); pageApprovals.classList.remove("hidden"); }
+    if (which === "intimations"){ tabIntimations.classList.add("active"); pageIntimations.classList.remove("hidden"); }
+    if (which === "history"){ tabHistory.classList.add("active"); pageHistory.classList.remove("hidden"); }
+  }
+
+  tabDash.addEventListener("click", async () => { showPage("dash"); await loadDashboard(); });
+  tabApprovals.addEventListener("click", async () => { showPage("approvals"); await loadApprovals(); });
+  tabIntimations.addEventListener("click", async () => { showPage("intimations"); await loadIntimations(); });
+  tabHistory.addEventListener("click", async () => { showPage("history"); await loadHistory(); });
+
+  logoutBtn.addEventListener("click", async () => {
+    await signOut(auth);
+    // GitHub Pages safe: from /pages/ back to root
+    window.location.href = "../index.html";
+  });
+
+  function buildAvatarNode(studentName, photoRaw){
+    const init = initials(studentName);
+    const wrap = document.createElement("div");
+    wrap.className = "studentAvatar";
+    wrap.textContent = init;
+
+    const { primary, fallback } = resolvePhotoURL(photoRaw);
+    if (!primary) return wrap;
+
+    const img = new Image();
+    img.alt = "Student photo";
+    img.referrerPolicy = "no-referrer";
+
+    let triedFallback = false;
+    img.onload = () => {
+      wrap.textContent = "";
+      wrap.appendChild(img);
+    };
+    img.onerror = () => {
+      if (!triedFallback && fallback){
+        triedFallback = true;
+        img.src = fallback;
+        return;
+      }
+      wrap.textContent = init;
+    };
+
+    img.src = primary;
+    return wrap;
+  }
+
+  function matchesText(r, needle){
+    if (!needle) return true;
+    const n = needle.toLowerCase();
+    const pool = [r.student_name, r.student_rollno, r.student_email]
+      .map(x => String(x||"").toLowerCase()).join(" | ");
+    return pool.includes(n);
+  }
+  function matchesYear(r, y){
+    if (!y) return true;
+    return String(r.student_year || "") === String(y);
+  }
+  function matchesHostel(r, h){
+    if (!h) return true;
+    return String(r.student_hostel || "").toLowerCase() === String(h).toLowerCase();
+  }
+
+  /* ---------------- Dashboard ---------------- */
+  async function loadDashboard(){
+    const from = dFrom.value;
+    const to = dTo.value;
+
+    const approvedSingleQ = query(collection(db, "leave_requests"),
+      where("status","==","approved"),
+      where("leave_type","==","single"),
+      limit(5000)
+    );
+    const approvedOneQ = query(collection(db, "leave_requests"),
+      where("status","==","approved"),
+      where("leave_type","==","one"),
+      limit(5000)
+    );
+    const approvedExtendedQ = query(collection(db, "leave_requests"),
+      where("status","==","approved"),
+      where("leave_type","==","extended"),
+      limit(5000)
+    );
+
+    const deanPendingQ = query(collection(db, "leave_requests"),
+      where("leave_type","==","extended"),
+      where("status","==","pending"),
+      where("current_holder_email","==", normalizeEmail(DEAN_EMAIL)),
+      limit(5000)
+    );
+    const deanApprovedQ = query(collection(db, "leave_requests"),
+      where("final_approved_by","==", normalizeEmail(DEAN_EMAIL)),
+      limit(5000)
+    );
+    const deanRejectedQ = query(collection(db, "leave_requests"),
+      where("final_rejected_by","==", normalizeEmail(DEAN_EMAIL)),
+      limit(5000)
+    );
+
+    const [aSingle, aOne, aExt, dP, dA, dR] = await Promise.all([
+      getDocs(approvedSingleQ),
+      getDocs(approvedOneQ),
+      getDocs(approvedExtendedQ),
+      getDocs(deanPendingQ),
+      getDocs(deanApprovedQ),
+      getDocs(deanRejectedQ)
+    ]);
+
+    const countInRange = (snap) =>
+      snap.docs.map(d => d.data()).filter(x => inDateRange(x.out_datetime, from, to)).length;
+
+    mApprovedSingle.textContent = countInRange(aSingle);
+    mApprovedOne.textContent = countInRange(aOne);
+    mApprovedExtended.textContent = countInRange(aExt);
+
+    mDeanPending.textContent = dP.docs.map(d=>d.data()).filter(x => inDateRange(x.out_datetime, from, to)).length;
+    mDeanApproved.textContent = countInRange(dA);
+    mDeanRejected.textContent = countInRange(dR);
+  }
+
+  applyDashBtn.addEventListener("click", loadDashboard);
+  clearDashBtn.addEventListener("click", async () => {
+    dFrom.value = "";
+    dTo.value = "";
+    await loadDashboard();
+  });
+
+  /* ---------------- Cards ---------------- */
+  function renderApprovalCard(r){
+    const card = document.createElement("section");
+    card.className = "requestCard";
+
+    const studentName = r.student_name || "—";
+    const roll = r.student_rollno || "—";
+    const email = r.student_email || "—";
+    const room = r.student_room_no || "—";
+    const reason = r.reason || "-";
+    const outVal = r.out_datetime || "";
+    const inVal = r.in_datetime || "";
+
+    const photo =
+      r.student_photo_url ||
+      r.studentPhotoUrl ||
+      r.photo_url ||
+      r.photoUrl ||
+      r.student?.photo_url ||
+      "";
+
+    const remarkId = `remark_${r.id}`;
+
+    const top = document.createElement("div");
+    top.className = "cardTop";
+
+    const studentBlock = document.createElement("div");
+    studentBlock.className = "studentBlock";
+    studentBlock.appendChild(buildAvatarNode(studentName, photo));
+
+    const text = document.createElement("div");
+    text.className = "studentText";
+    text.innerHTML = `
+      <div class="studentName">${studentName}</div>
+      <div class="studentMeta">${roll} • ${email} • Room ${room}</div>
+      <div class="tagType"><span class="miniDot"></span>Type: EXTENDED</div>
+    `;
+    studentBlock.appendChild(text);
+
+    top.appendChild(studentBlock);
+
+    const pill = document.createElement("div");
+    pill.innerHTML = `<span class="pill pending">PENDING</span>`;
+    top.appendChild(pill);
+
+    card.appendChild(top);
+
+    const details = document.createElement("div");
+    details.className = "details";
+    details.innerHTML = `
+      <div class="kv"><div class="k">OUT DATE & TIME</div><div class="v">${fmtDT(outVal)}</div></div>
+      <div class="kv"><div class="k">IN DATE & TIME</div><div class="v">${fmtDT(inVal)}</div></div>
+      <div class="kv reasonBox"><div class="k">REASON</div><div class="v">${reason}</div></div>
+    `;
+    card.appendChild(details);
+
+    const ta = document.createElement("textarea");
+    ta.id = remarkId;
+    ta.placeholder = "Remark (optional)";
+    card.appendChild(ta);
+
+    const actions = document.createElement("div");
+    actions.className = "actionsRow";
+
+    const approve = document.createElement("button");
+    approve.className = "actionBtn approveBtn";
+    approve.type = "button";
+    approve.textContent = "Approve";
+    approve.addEventListener("click", () => approveExtended(r.id, false));
+
+    const reject = document.createElement("button");
+    reject.className = "actionBtn rejectBtn";
+    reject.type = "button";
+    reject.textContent = "Reject";
+    reject.addEventListener("click", () => rejectExtended(r.id));
+
+    actions.appendChild(approve);
+    actions.appendChild(reject);
+    card.appendChild(actions);
+
+    return card;
+  }
+
+  function renderIntimationCard(r){
+    const card = document.createElement("section");
+    card.className = "requestCard";
+
+    const studentName = r.student_name || "—";
+    const roll = r.student_rollno || "—";
+    const email = r.student_email || "—";
+    const room = r.student_room_no || "—";
+    const reason = r.reason || "-";
+    const outVal = r.out_datetime || "";
+    const inVal = r.in_datetime || "";
+
+    const photo =
+      r.student_photo_url ||
+      r.studentPhotoUrl ||
+      r.photo_url ||
+      r.photoUrl ||
+      r.student?.photo_url ||
+      "";
+
+    card.innerHTML = `
+      <div class="cardTop">
+        <div class="studentBlock">
+          <div class="studentText">
+            <div class="studentName">${studentName}</div>
+            <div class="studentMeta">${roll} • ${email} • Room ${room}</div>
+            <div class="tagType"><span class="miniDot"></span>Type: ONE DAY (INTIMATION)</div>
+          </div>
+        </div>
+        <span class="pill approved">APPROVED</span>
+      </div>
+
+      <div class="details">
+        <div class="kv"><div class="k">OUT DATE & TIME</div><div class="v">${fmtDT(outVal)}</div></div>
+        <div class="kv"><div class="k">IN DATE & TIME</div><div class="v">${fmtDT(inVal)}</div></div>
+        <div class="kv reasonBox"><div class="k">REASON</div><div class="v">${reason}</div></div>
+      </div>
+    `;
+
+    const sb = card.querySelector(".studentBlock");
+    sb.prepend(buildAvatarNode(studentName, photo));
+
+    return card;
+  }
+
+  function renderHistoryCard(r){
+    const card = document.createElement("section");
+    card.className = "requestCard";
+
+    const studentName = r.student_name || "—";
+    const roll = r.student_rollno || "—";
+    const email = r.student_email || "—";
+    const room = r.student_room_no || "—";
+    const reason = r.reason || "-";
+    const outVal = r.out_datetime || "";
+    const inVal = r.in_datetime || "";
+
+    const photo =
+      r.student_photo_url ||
+      r.studentPhotoUrl ||
+      r.photo_url ||
+      r.photoUrl ||
+      r.student?.photo_url ||
+      "";
+
+    const status = String(r.__histStatus || r.status || "").toLowerCase();
+    const canApproveFromHistory = status === "rejected";
+
+    card.innerHTML = `
+      <div class="cardTop">
+        <div class="studentBlock">
+          <div class="studentText">
+            <div class="studentName">${studentName}</div>
+            <div class="studentMeta">${roll} • ${email} • Room ${room}</div>
+            <div class="tagType"><span class="miniDot"></span>Type: EXTENDED</div>
+          </div>
+        </div>
+        ${statusPill(status)}
+      </div>
+
+      <div class="details">
+        <div class="kv"><div class="k">OUT DATE & TIME</div><div class="v">${fmtDT(outVal)}</div></div>
+        <div class="kv"><div class="k">IN DATE & TIME</div><div class="v">${fmtDT(inVal)}</div></div>
+        <div class="kv reasonBox"><div class="k">REASON</div><div class="v">${reason}</div></div>
+      </div>
+
+      ${canApproveFromHistory ? `
+        <div class="actionsRow">
+          <button class="actionBtn approveBtn" type="button">Approve Now</button>
+        </div>
+      ` : ``}
+    `;
+
+    const sb = card.querySelector(".studentBlock");
+    sb.prepend(buildAvatarNode(studentName, photo));
+
+    if (canApproveFromHistory){
+      card.querySelector(".approveBtn").addEventListener("click", () => approveExtended(r.id, true));
+    }
+
+    return card;
+  }
+
+  /* ---------------- Load lists ---------------- */
+  async function loadApprovals(){
+    approvalsList.innerHTML = "";
+    const q1 = query(
+      collection(db, "leave_requests"),
+      where("leave_type", "==", "extended"),
+      where("status", "==", "pending"),
+      where("current_holder_email", "==", normalizeEmail(DEAN_EMAIL)),
+      limit(5000)
+    );
+
+    const snap = await getDocs(q1);
+    const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    rows.sort((a,b) => String(b.out_datetime||"").localeCompare(String(a.out_datetime||"")));
+
+    if (!rows.length){
+      approvalsList.innerHTML = `<div class="empty">No pending extended approvals.</div>`;
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    for (const r of rows) frag.appendChild(renderApprovalCard(r));
+    approvalsList.appendChild(frag);
+  }
+
+  async function loadIntimations(){
+    intimationList.innerHTML = "";
+
+    const q1 = query(
+      collection(db, "leave_requests"),
+      where("leave_type", "==", "one"),
+      where("status", "==", "approved"),
+      where("dean_intimation_required", "==", true),
+      where("dean_intimated", "==", false),
+      limit(5000)
+    );
+
+    const snap = await getDocs(q1);
+    let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    rows.sort((a,b) => String(b.out_datetime||"").localeCompare(String(a.out_datetime||"")));
+
+    const s = (iSearch.value||"").trim();
+    const y = iYear.value;
+    const h = iHostel.value;
+    const from = iFrom.value;
+    const to = iTo.value;
+
+    rows = rows.filter(r =>
+      matchesText(r, s) &&
+      matchesYear(r, y) &&
+      matchesHostel(r, h) &&
+      inDateRange(r.out_datetime, from, to)
+    );
+
+    if (!rows.length){
+      intimationList.innerHTML = `<div class="empty">No matching intimations.</div>`;
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    for (const r of rows) frag.appendChild(renderIntimationCard(r));
+    intimationList.appendChild(frag);
+  }
+
+  async function loadHistory(){
+    historyList.innerHTML = "";
+
+    const qApproved = query(
+      collection(db, "leave_requests"),
+      where("leave_type","==","extended"),
+      where("final_approved_by","==", normalizeEmail(DEAN_EMAIL)),
+      limit(5000)
+    );
+    const qRejected = query(
+      collection(db, "leave_requests"),
+      where("leave_type","==","extended"),
+      where("final_rejected_by","==", normalizeEmail(DEAN_EMAIL)),
+      limit(5000)
+    );
+
+    const [aS, rS] = await Promise.all([getDocs(qApproved), getDocs(qRejected)]);
+    let rows = [
+      ...aS.docs.map(d => ({ id:d.id, ...d.data(), __histStatus:"approved" })),
+      ...rS.docs.map(d => ({ id:d.id, ...d.data(), __histStatus:"rejected" }))
+    ];
+
+    const s = (hSearch.value||"").trim();
+    const st = hStatus.value;
+    const y = hYear.value;
+    const h = hHostel.value;
+    const from = hFrom.value;
+    const to = hTo.value;
+
+    rows = rows.filter(r =>
+      matchesText(r, s) &&
+      (st ? r.__histStatus === st : true) &&
+      matchesYear(r, y) &&
+      matchesHostel(r, h) &&
+      inDateRange(r.out_datetime, from, to)
+    );
+
+    rows.sort((a,b) => {
+      const ta = a.final_approved_at || a.final_rejected_at || a.out_datetime || "";
+      const tb = b.final_approved_at || b.final_rejected_at || b.out_datetime || "";
+      return String(tb).localeCompare(String(ta));
+    });
+
+    if (!rows.length){
+      historyList.innerHTML = `<div class="empty">No matching history.</div>`;
+      return;
+    }
+
+    const frag = document.createDocumentFragment();
+    for (const r of rows) frag.appendChild(renderHistoryCard(r));
+    historyList.appendChild(frag);
+  }
+
+  applyIntBtn.addEventListener("click", loadIntimations);
+  applyHistBtn.addEventListener("click", loadHistory);
+
+  clearIntBtn.addEventListener("click", async () => {
+    iSearch.value = "";
+    iYear.value = "";
+    iHostel.value = "";
+    iFrom.value = "";
+    iTo.value = "";
+    await loadIntimations();
+  });
+  clearHistBtn.addEventListener("click", async () => {
+    hSearch.value = "";
+    hStatus.value = "";
+    hYear.value = "";
+    hHostel.value = "";
+    hFrom.value = "";
+    hTo.value = "";
+    await loadHistory();
+  });
+
+  /* ---------------- Approve/Reject ---------------- */
+  async function approveExtended(id, fromHistory){
+    const remarkEl = document.getElementById(`remark_${id}`);
+    const remark = fromHistory ? "" : (remarkEl?.value || "").trim();
+
+    const ref = doc(db, "leave_requests", id);
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+
+    const r = snap.data();
+    if (String(r.status||"").toLowerCase() === "approved"){
+      alert("Already approved. No further action allowed.");
+      return;
+    }
+
+    const chain = Array.isArray(r.approver_chain) ? [...r.approver_chain] : [];
+    const idx = chain.findIndex(x => normalizeEmail(x?.email) === normalizeEmail(DEAN_EMAIL));
+    if (idx < 0){
+      alert("Dean stage not found in chain.");
+      return;
+    }
+
+    chain[idx] = { ...chain[idx], status:"approved", action:"approved", actedAt: isoNow(), remark: remark || "" };
+
+    const updates = {
+      approver_chain: chain,
+      current_holder_email: null,
+      status: "approved",
+      final_approved_by: normalizeEmail(DEAN_EMAIL),
+      final_approved_at: isoNow(),
+      final_rejected_by: null,
+      final_rejected_at: null,
+      updated_at: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    try{
+      await updateDoc(ref, updates);
+      await loadDashboard();
+      if (!fromHistory) await loadApprovals();
+      await loadHistory();
+    }catch(e){
+      console.error(e);
+      alert("Unable to approve. Check Firestore rules.");
+    }
+  }
+
+  async function rejectExtended(id){
+    const remark = (document.getElementById(`remark_${id}`)?.value || "").trim();
+    const ref = doc(db, "leave_requests", id);
+
+    const snap = await getDoc(ref);
+    if (!snap.exists()) return;
+
+    const r = snap.data();
+    if (String(r.status||"").toLowerCase() === "approved"){
+      alert("Already approved. No further action allowed.");
+      return;
+    }
+
+    const chain = Array.isArray(r.approver_chain) ? [...r.approver_chain] : [];
+    const idx = chain.findIndex(x => normalizeEmail(x?.email) === normalizeEmail(DEAN_EMAIL));
+    if (idx < 0){ alert("Dean stage not found in chain."); return; }
+
+    chain[idx] = { ...chain[idx], status:"rejected", action:"rejected", actedAt: isoNow(), remark: remark || "" };
+
+    const updates = {
+      approver_chain: chain,
+      current_holder_email: null,
+      status: "rejected",
+      final_rejected_by: normalizeEmail(DEAN_EMAIL),
+      final_rejected_at: isoNow(),
+      updated_at: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    try{
+      await updateDoc(ref, updates);
+      await loadApprovals();
+      await loadDashboard();
+      await loadHistory();
+    }catch(e){
+      console.error(e);
+      alert("Unable to reject. Check Firestore rules.");
+    }
+  }
+
+  onAuthStateChanged(auth, async (u) => {
+    if (!u){
+      window.location.href = "../index.html";
+      return;
+    }
+    if (normalizeEmail(u.email) !== normalizeEmail(DEAN_EMAIL)){
+      alert("Access denied. Dean only.");
+      await signOut(auth);
+      window.location.href = "../index.html";
+      return;
+    }
+
+    showPage("dash");
+    await loadDashboard();
+  });
+</script>
+</body>
+</html>
