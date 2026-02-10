@@ -400,7 +400,7 @@
   <div class="topbar">
     <div class="topbarInner">
       <div class="brand">
-        <img src="../assets/img/xime-logo.jpg" alt="XIME Logo" />
+        <img id="ximeLogo" src="../assets/img/xime-logo.jpg" alt="XIME Logo" />
         <div class="brandText">
           <div class="inst">Xavier Institute of Management and Entrepreneurship</div>
           <div class="sys">Leave Management System</div>
@@ -436,6 +436,11 @@
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
     import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
+    // ✅ bfcache fix (back button after logout)
+    window.addEventListener("pageshow", (e) => {
+      if (e.persisted) window.location.reload();
+    });
+
     const firebaseConfig = {
       apiKey: "AIzaSyDgoq2rMU5kiKcz_27-hjBzd8rxS8yQqdY",
       authDomain: "xime-leave-system-b25a4.firebaseapp.com",
@@ -453,6 +458,17 @@
     const logoutBtn = document.getElementById("logoutBtn");
     const toast = document.getElementById("toast");
     const mount = document.getElementById("mount");
+
+    // ✅ logo fallback
+    const ximeLogo = document.getElementById("ximeLogo");
+    ximeLogo?.addEventListener("error", () => {
+      if (!ximeLogo.dataset.try2){
+        ximeLogo.dataset.try2 = "1";
+        ximeLogo.src = "../assets/img/xime-logo.jpg";
+        return;
+      }
+      ximeLogo.style.display = "none";
+    });
 
     function showToast(msg){
       toast.className = "toast show bad";
@@ -543,8 +559,9 @@
       return { primary:"", fallback:"" };
     }
 
+    // ✅ Canonical QR link (origin + same page path + id param)
     function buildQrLink(id){
-      const url = new URL(location.href);
+      const url = new URL(window.location.origin + window.location.pathname);
       url.searchParams.set("id", id);
       return url.toString();
     }
@@ -554,7 +571,7 @@
       return u.searchParams.get("id") || "";
     }
 
-    // ✅ key logic: expired = NOW > IN datetime
+    // ✅ expired = NOW > IN datetime
     function isExpiredFromData(data){
       const inIso = data?.in_datetime || data?.inDT || "";
       const inD = new Date(inIso);
@@ -664,6 +681,7 @@
 
       if (primary){
         let usedFallback = false;
+        img.referrerPolicy = "no-referrer";
         img.onload = () => { img.style.display="block"; av.style.display="none"; };
         img.onerror = () => {
           if (!usedFallback && fallback){ usedFallback = true; img.src = fallback; return; }
@@ -680,12 +698,14 @@
     }
 
     backBtn.addEventListener("click", () => {
+      // private student flow
       window.location.href = "student-dashboard.html";
     });
 
     logoutBtn.addEventListener("click", async () => {
-      await signOut(auth);
-      window.location.href = "../index.html";
+      try{ await signOut(auth); }catch(_){}
+      // ✅ replace to avoid back-opening this page
+      window.location.replace("../index.html");
     });
 
     async function loadGatepassPublic(id){
@@ -702,7 +722,6 @@
         return;
       }
 
-      // ✅ If expired -> BLOCK
       if (isExpiredFromData(data)){
         showToast("Gatepass expired. Please contact hostel office if needed.");
         return;
@@ -718,9 +737,10 @@
         return;
       }
 
-      // ✅ PUBLIC VIEW: if not logged in
+      // ✅ PUBLIC VIEW
       if (!u){
         logoutBtn.style.display = "none";
+        backBtn.style.display = "none"; // ✅ IMPORTANT FIX
         try{
           await loadGatepassPublic(id);
         }catch(e){
@@ -730,7 +750,7 @@
         return;
       }
 
-      // ✅ PRIVATE VIEW: logged in student
+      // ✅ PRIVATE VIEW (student)
       try{
         const snap = await getDoc(doc(db, "leave_requests", id));
         if (!snap.exists()){
@@ -753,7 +773,6 @@
           return;
         }
 
-        // ✅ If expired -> BLOCK
         if (isExpiredFromData(data)){
           showToast("Gatepass expired. Please contact hostel office if needed.");
           return;
