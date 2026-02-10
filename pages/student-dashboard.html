@@ -457,7 +457,6 @@
     .sb-approved{ color:var(--good); border-color: rgba(15,118,110,.25); background: rgba(15,118,110,.06); }
     .sb-rejected{ color:var(--bad); border-color: rgba(180,35,24,.22); background: rgba(180,35,24,.06); }
 
-    /* tiny helper */
     .muted{ color:var(--muted); font-weight:650; }
   </style>
 </head>
@@ -466,7 +465,7 @@
   <div class="topbar">
     <div class="topbarInner">
       <div class="brand">
-        <img src="../assets/img/xime-logo.jpg" alt="XIME Logo" />
+        <img id="ximeLogo" src="../assets/img/xime-logo.jpg" alt="XIME Logo" />
         <div class="brandText">
           <div class="inst">Xavier Institute of Management and Entrepreneurship</div>
           <div class="sys">Leave Management System</div>
@@ -503,7 +502,7 @@
         <div class="profileRow">
           <div class="photoBox">
             <img id="avatar" class="avatar" alt="Student photo" />
-            <div id="avatarPh" class="avatarPlaceholder">PHOTO</div>
+            <div id="avatarPh" class="avatarPlaceholder">_toggle_ PHOTO</div>
             <div class="photoHint" id="photoHint">Photo will appear here if available.</div>
           </div>
 
@@ -590,6 +589,11 @@
       query, where, limit, getDocs, serverTimestamp
     } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
+    // ✅ bfcache fix: after logout, back button shouldn't show old dashboard
+    window.addEventListener("pageshow", (e) => {
+      if (e.persisted) window.location.reload();
+    });
+
     const firebaseConfig = {
       apiKey: "AIzaSyDgoq2rMU5kiKcz_27-hjBzd8rxS8yQqdY",
       authDomain: "xime-leave-system-b25a4.firebaseapp.com",
@@ -609,6 +613,17 @@
     const app = initializeApp(firebaseConfig);
     const auth = getAuth(app);
     const db = getFirestore(app);
+
+    // ✅ logo fallback (GitHub pages safe)
+    const logo = document.getElementById("ximeLogo");
+    logo.addEventListener("error", () => {
+      if (!logo.dataset.try2){
+        logo.dataset.try2 = "1";
+        logo.src = "../assets/img/xime-logo.jpg";
+        return;
+      }
+      logo.style.display = "none";
+    });
 
     // ===== DOM =====
     const logoutBtn = document.getElementById("logoutBtn");
@@ -726,11 +741,11 @@
     mainApply.addEventListener("click", () => setMainTab("apply"));
 
     logoutBtn.addEventListener("click", async () => {
-      await signOut(auth);
-      window.location.href = "../index.html";
+      try{ await signOut(auth); }catch(_){}
+      window.location.replace("../index.html"); // ✅ avoid back-cache showing dashboard
     });
 
-    // ===== Photo handling (same logic you had, kept stable) =====
+    // ===== Photo handling =====
     function extractDriveId(url){
       const u = String(url || "").trim();
       if (!u) return "";
@@ -742,6 +757,7 @@
       if (m3 && m3[1]) return m3[1];
       return "";
     }
+
     function resolveDriveUrls(rawLink){
       const id = extractDriveId(rawLink);
       if (!id) return { primary: rawLink, fallback: "" };
@@ -750,16 +766,28 @@
         fallback: `https://drive.google.com/uc?export=view&id=${id}`
       };
     }
+
     function resolvePhotoURL(studentObj){
       const raw =
-        studentObj.photo_url || studentObj.photoUrl || studentObj.photoURL ||
-        studentObj.photo || studentObj.photoLink || studentObj.imageUrl || studentObj.imageURL || "";
+        studentObj?.student_photo_url ||
+        studentObj?.studentPhotoUrl ||
+        studentObj?.photo_url ||
+        studentObj?.photoUrl ||
+        studentObj?.photoURL ||
+        studentObj?.photo ||
+        studentObj?.photoLink ||
+        studentObj?.imageUrl ||
+        studentObj?.imageURL ||
+        "";
+
       const link = String(raw || "").trim();
       if (!link) return { primary: "", fallback: "" };
+
       if (link.includes("drive.google.com") || link.includes("googleusercontent.com")) return resolveDriveUrls(link);
       if (link.startsWith("http://") || link.startsWith("https://")) return { primary: link, fallback: "" };
       return { primary: "", fallback: "" };
     }
+
     function setStudentPhoto(studentObj){
       const { primary, fallback } = resolvePhotoURL(studentObj);
 
@@ -773,6 +801,8 @@
 
       photoHint.textContent = "Loading photo…";
       let usedFallback = false;
+
+      avatar.referrerPolicy = "no-referrer"; // ✅ helps on Google-hosted images
 
       avatar.onload = () => {
         avatar.style.display = "block";
@@ -805,6 +835,7 @@
       if (!snap.exists()) throw new Error("User mapping not found. Contact Batch Coordinator.");
       return snap.data();
     }
+
     async function getRoster(roll){
       const snap = await getDoc(doc(db, "students_roster", roll));
       if (!snap.exists()) throw new Error("Roster not found. Contact Batch Coordinator.");
@@ -839,14 +870,12 @@
 
     async function getApprovedCountThisMonthByEmail(studentEmail, leaveTypeDB, monthKey){
       const q1 = query(
-        // note: still simple query to avoid needing composite indexes
         collection(db, "leave_requests"),
         where("student_email", "==", studentEmail),
         limit(250)
       );
       const snap = await getDocs(q1);
 
-      // Filter in-memory (stable + avoids index)
       let count = 0;
       snap.forEach(docu => {
         const r = docu.data() || {};
@@ -858,7 +887,7 @@
       return count;
     }
 
-    // ===== History (lazy-loaded for speed) =====
+    // ===== History =====
     let activeHistoryType = "single_day";
     let historyLoadedOnce = false;
 
@@ -1062,15 +1091,13 @@
     mainHistory.addEventListener("click", async () => {
       setMainTab("history");
       setActiveHistoryTab(activeHistoryType);
-
-      // ✅ Lazy load history only when needed (faster initial load)
       if (studentEmailLower){
         historyLoadedOnce = true;
         await loadHistoryByEmail(studentEmailLower, activeHistoryType);
       }
     });
 
-    // ===== Approver chain helpers (same as your logic) =====
+    // ===== Approver chain helpers =====
     function nextHolderEmail(chain){
       const arr = Array.isArray(chain) ? chain : [];
       const p = arr.find(x => String(x.action || x.status || "").toLowerCase() === "pending");
@@ -1176,13 +1203,14 @@
         const deanIntimationRequired = (leaveTypeDB === "one");
 
         const payload = {
+          student_uid: currentUser?.uid || "", // ✅ IMPORTANT for gatepass checks
           student_rollno: studentRoll,
           student_name: student.name || "",
           student_email: studentEmailLower,
           student_year: Number(year) || year,
           student_hostel: hostel,
           student_room_no: roomVal,
-          student_photo_url: student.photo_url || "",
+          student_photo_url: student.student_photo_url || student.photo_url || "",
           approved_before_in_month: approvedBefore,
           grant_index_in_month: grantIndex,
           month_key: monthKey,
@@ -1213,7 +1241,6 @@
         leaveForm.reset();
         updateTypeBadge();
 
-        // optional: if history already opened once, refresh it (nice UX)
         if (historyLoadedOnce && studentEmailLower){
           await loadHistoryByEmail(studentEmailLower, activeHistoryType);
         }
