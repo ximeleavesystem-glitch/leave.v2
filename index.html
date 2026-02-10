@@ -3,6 +3,12 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- ✅ Anti-cache (helps with back/forward after logout on GitHub Pages) -->
+  <meta http-equiv="Cache-Control" content="no-store, no-cache, must-revalidate, max-age=0" />
+  <meta http-equiv="Pragma" content="no-cache" />
+  <meta http-equiv="Expires" content="0" />
+
   <title>XIME — Leave Management System</title>
 
   <style>
@@ -56,7 +62,7 @@
     }
     .inst{
       margin:0;
-      font-size:22px;           /* increased as requested */
+      font-size:22px;
       font-weight:900;
       letter-spacing:.15px;
       white-space:normal;
@@ -120,7 +126,7 @@
     .ghost{ border:1px solid var(--line); background:#fff; color:#111827; box-shadow:none; }
     .ghost:hover{ border-color: rgba(193,18,31,.35); }
 
-    /* Loading state without changing button text (fixes “Working…”) */
+    /* Loading state without changing button text */
     .btn.loading{
       pointer-events:none;
       opacity:.75;
@@ -152,7 +158,6 @@
     .hint{ font-size:12px; color:var(--muted); margin-top:2px; font-weight:600; }
     .hidden{ display:none !important; }
 
-    /* Small screens: keep header neat */
     @media (max-width: 420px){
       .header{ gap:10px; }
       .logoImg{ width:74px; max-height:48px; }
@@ -165,7 +170,6 @@
 <body>
   <div class="wrap">
     <div class="header">
-      <!-- GitHub Pages safe relative path -->
       <img class="logoImg" src="./assets/img/xime-logo.jpg" alt="XIME Logo" />
       <div class="headText">
         <h1 class="inst">Xavier Institute of Management and Entrepreneurship</h1>
@@ -290,37 +294,31 @@
       }
     }
 
-    // More robust role resolve:
-    // 1) Try by doc id (email)
-    // 2) If not found, try query by field "email" == email (covers mismatch in doc id)
-    // If reads are blocked by rules, it will throw and we fallback to student.
     async function resolveRoleByEmail(email){
       const e = normalizeEmail(email);
       if (!e || !e.includes("@")) return "student";
 
-      // admins first
       try{
         const adminSnap = await getDoc(doc(db, "admins", e));
         if (adminSnap.exists()) return "dean";
-      }catch(_){ /* ignore, fallback below */ }
+      }catch(_){}
 
       try{
         const adminQ = query(collection(db, "admins"), where("email", "==", e));
         const adminQS = await getDocs(adminQ);
         if (!adminQS.empty) return "dean";
-      }catch(_){ /* ignore */ }
+      }catch(_){}
 
-      // approvers next
       try{
         const apprSnap = await getDoc(doc(db, "approvers", e));
         if (apprSnap.exists()) return "approver";
-      }catch(_){ /* ignore */ }
+      }catch(_){}
 
       try{
         const apprQ = query(collection(db, "approvers"), where("email", "==", e));
         const apprQS = await getDocs(apprQ);
         if (!apprQS.empty) return "approver";
-      }catch(_){ /* ignore */ }
+      }catch(_){}
 
       return "student";
     }
@@ -336,10 +334,11 @@
       }
     }
 
+    // ✅ use replace() so back button doesn't return to protected page
     function routeByRole(role){
-      if (role === "student") window.location.href = "./pages/student-dashboard.html";
-      else if (role === "approver") window.location.href = "./pages/approver-dashboard.html";
-      else if (role === "dean") window.location.href = "./pages/dean-dashboard.html";
+      if (role === "student") window.location.replace("./pages/student-dashboard.html");
+      else if (role === "approver") window.location.replace("./pages/approver-dashboard.html");
+      else if (role === "dean") window.location.replace("./pages/dean-dashboard.html");
       else showToast(toastLogin, "Unknown role. Cannot route.", "bad");
     }
 
@@ -366,13 +365,11 @@
     tabRegister.addEventListener("click", switchToRegister);
     backToLoginBtn.addEventListener("click", switchToLogin);
 
-    // On typing: keep student UI until we confirm role (no flicker)
     regEmail.addEventListener("input", () => {
       detectedRole = "student";
       applyRoleUI("student");
       clearToast(toastRegister);
 
-      // Debounced role lookup for better UX
       if (roleLookupTimer) clearTimeout(roleLookupTimer);
       roleLookupTimer = setTimeout(async () => {
         initFirebase();
@@ -390,7 +387,6 @@
       }, 350);
     });
 
-    // Also run on blur (if user pastes and leaves immediately)
     regEmail.addEventListener("blur", async () => {
       initFirebase();
       const email = normalizeEmail(regEmail.value);
@@ -414,7 +410,6 @@
       const email = normalizeEmail(loginEmail.value);
       const password = loginPassword.value;
 
-      // Loading without changing text (fix “Working…”)
       loginBtn.classList.add("loading");
 
       try{
@@ -424,7 +419,7 @@
         showToast(toastLogin, "Login successful. Routing…", "good");
 
         const role = await resolveRoleByEmail(email);
-        setTimeout(() => routeByRole(role), 150);
+        setTimeout(() => routeByRole(role), 120);
       }catch(err){
         const msg = (err?.message || "Login failed.")
           .replace("Firebase: ", "")
