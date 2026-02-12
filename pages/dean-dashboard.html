@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>XIME — Dean’s Dashboard</title>
 
+<!-- ✅ jsPDF for report download -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
 <style>
 :root{
   --red:#c1121f;
@@ -388,6 +391,46 @@ textarea:focus{
   border:1px dashed var(--line);
   border-radius:14px;
 }
+
+/* ✅ Report block (professional) */
+.reportWrap{
+  border:1px solid var(--line);
+  border-radius:14px;
+  background: rgba(193,18,31,.02);
+  padding:12px;
+}
+.reportTitle{
+  margin:0 0 10px 0;
+  font-size:13px;
+  font-weight:900;
+  color: var(--redDark);
+}
+.checkRow{
+  display:flex;
+  flex-wrap:wrap;
+  gap:8px;
+  align-items:center;
+}
+.chk{
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:#fff;
+  font-weight:800;
+  font-size:12px;
+  color:#111827;
+  user-select:none;
+}
+.chk input{ transform: translateY(1px); }
+.smallHint{
+  font-size:12px;
+  color:var(--muted);
+  font-weight:650;
+  margin-left:auto;
+}
 </style>
 </head>
 
@@ -467,6 +510,29 @@ textarea:focus{
             <div class="v" id="mDeanRejected">0</div>
           </div>
         </div>
+
+        <!-- ✅ NEW: REPORT DOWNLOAD SECTION -->
+        <div class="sectionTitle" style="margin-top:6px;">
+          <h4>Download Reports</h4>
+          <div class="hint">Approved + Expired only • In-date filter</div>
+        </div>
+
+        <div class="reportWrap">
+          <div class="filters" style="margin-bottom:10px;">
+            <input class="input" id="repFrom" type="date" title="From (In date)">
+            <input class="input" id="repTo" type="date" title="To (In date)">
+            <input class="input" id="repRoll" placeholder="Roll No (Optional)" style="min-width:220px;">
+            <button class="applyBtn" id="repDownloadBtn" type="button">Download PDF</button>
+          </div>
+
+          <div class="checkRow">
+            <label class="chk"><input type="checkbox" id="repTypeSingle" checked> Single</label>
+            <label class="chk"><input type="checkbox" id="repTypeOne" checked> One Day</label>
+            <label class="chk"><input type="checkbox" id="repTypeExtended" checked> Extended</label>
+            <div class="smallHint">Tip: Select types + date range → Download</div>
+          </div>
+        </div>
+        <!-- ✅ END REPORT SECTION -->
 
       </div>
     </div>
@@ -628,7 +694,17 @@ textarea:focus{
   const applyHistBtn = document.getElementById("applyHistBtn");
   const clearHistBtn = document.getElementById("clearHistBtn");
 
+  // ✅ NEW Report DOM
+  const repFrom = document.getElementById("repFrom");
+  const repTo = document.getElementById("repTo");
+  const repRoll = document.getElementById("repRoll");
+  const repDownloadBtn = document.getElementById("repDownloadBtn");
+  const repTypeSingle = document.getElementById("repTypeSingle");
+  const repTypeOne = document.getElementById("repTypeOne");
+  const repTypeExtended = document.getElementById("repTypeExtended");
+
   function normalizeEmail(v){ return String(v||"").trim().toLowerCase(); }
+  function normalizeRoll(v){ return String(v||"").trim().toUpperCase(); }
   function isoNow(){ return new Date().toISOString(); }
 
   // ✅ Create/update public gatepass doc (so QR works without login)
@@ -716,6 +792,15 @@ textarea:focus{
     return `${dd}/${mm}/${yyyy} ${hh}:${min} ${ampm}`;
   }
 
+  function fmtDateShort(iso){
+    const dt = new Date(iso);
+    if (isNaN(dt)) return "-";
+    const dd = String(dt.getDate()).padStart(2,"0");
+    const mm = String(dt.getMonth()+1).padStart(2,"0");
+    const yyyy = dt.getFullYear();
+    return `${dd}/${mm}/${yyyy}`;
+  }
+
   function initials(name){
     const n = String(name || "").trim();
     if (!n) return "ST";
@@ -749,7 +834,6 @@ textarea:focus{
 
   logoutBtn.addEventListener("click", async () => {
     try{ await signOut(auth); }catch(_){}
-    // ✅ replace so back button won't re-open the dean page
     window.location.replace("../index.html");
   });
 
@@ -863,6 +947,202 @@ textarea:focus{
     dTo.value = "";
     await loadDashboard();
   });
+
+  /* ---------------- ✅ REPORT DOWNLOAD (PDF) ---------------- */
+  function getInDT(r){ return r.in_datetime || r.inDT || r.inDateTime || ""; }
+  function getOutDT(r){ return r.out_datetime || r.outDT || r.outDateTime || ""; }
+
+  function leaveTypeLabel(t){
+    const x = String(t||"").toLowerCase();
+    if (x === "single") return "Single Day";
+    if (x === "one") return "One Day";
+    if (x === "extended") return "Extended";
+    return (t || "-");
+  }
+
+  async function downloadDeanReportPDF(){
+    const from = repFrom.value || "";
+    const to = repTo.value || "";
+    const roll = normalizeRoll(repRoll.value || "");
+
+    const types = new Set();
+    if (repTypeSingle.checked) types.add("single");
+    if (repTypeOne.checked) types.add("one");
+    if (repTypeExtended.checked) types.add("extended");
+
+    if (!from || !to){
+      alert("Please select From Date and To Date (based on IN date).");
+      return;
+    }
+    if (!types.size){
+      alert("Please select at least one Leave Type.");
+      return;
+    }
+
+    repDownloadBtn.disabled = true;
+    repDownloadBtn.textContent = "Preparing...";
+
+    try{
+      // Fetch approved requests (expired are also approved, we handle expired in logic)
+      const q1 = query(
+        collection(db, "leave_requests"),
+        where("status", "==", "approved"),
+        limit(5000)
+      );
+
+      const snap = await getDocs(q1);
+      const now = new Date();
+
+      let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Filter by: in_datetime date range + leave type + optional roll
+      rows = rows.filter(r => {
+        const t = String(r.leave_type || "").toLowerCase();
+        if (!types.has(t)) return false;
+
+        const inISO = getInDT(r);
+        if (!inISO) return false;
+
+        if (!inDateRange(inISO, from, to)) return false;
+
+        if (roll){
+          const rr = normalizeRoll(r.student_rollno || "");
+          if (rr !== roll) return false;
+        }
+        return true;
+      });
+
+      // Sort by in_datetime ascending
+      rows.sort((a,b) => String(getInDT(a)||"").localeCompare(String(getInDT(b)||"")));
+
+      if (!rows.length){
+        alert("No approved/expired requests found for selected filters.");
+        return;
+      }
+
+      // Build PDF
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({ unit:"mm", format:"a4" });
+
+      const pageW = pdf.internal.pageSize.getWidth();
+      const margin = 12;
+
+      const title = "XIME Leave Management System";
+      const sub = "Approved Leave Report (Includes Expired)";
+      const meta = `In Date Range: ${from} to ${to}` + (roll ? ` • Roll: ${roll}` : "");
+
+      pdf.setFont("helvetica","bold");
+      pdf.setFontSize(14);
+      pdf.text(title, margin, 16);
+
+      pdf.setFont("helvetica","normal");
+      pdf.setFontSize(11);
+      pdf.text(sub, margin, 23);
+
+      pdf.setFontSize(10);
+      pdf.setTextColor(80);
+      pdf.text(meta, margin, 29);
+
+      pdf.setTextColor(0);
+      pdf.setDrawColor(200);
+      pdf.line(margin, 33, pageW - margin, 33);
+
+      let y = 40;
+      const lineH = 5;
+
+      const wrapText = (text, maxW) => pdf.splitTextToSize(String(text||"-"), maxW);
+
+      const addRowBlock = (r, idx) => {
+        const studentName = r.student_name || "—";
+        const rollno = r.student_rollno || "—";
+        const email = r.student_email || "—";
+        const hostel = r.student_hostel || "—";
+        const room = r.student_room_no || "—";
+        const year = r.student_year || "—";
+        const ltype = leaveTypeLabel(r.leave_type);
+        const outISO = getOutDT(r);
+        const inISO = getInDT(r);
+        const reason = r.reason || "-";
+
+        const expired = (() => {
+          const inD = new Date(inISO);
+          return (!isNaN(inD) && now > inD);
+        })();
+
+        // Section header
+        pdf.setFont("helvetica","bold");
+        pdf.setFontSize(11);
+        const head = `${idx}. ${studentName} (${rollno})`;
+        pdf.text(head, margin, y);
+        y += 6;
+
+        pdf.setFont("helvetica","normal");
+        pdf.setFontSize(10);
+        pdf.setTextColor(60);
+        pdf.text(`${email} • Year ${year} • ${hostel} • Room ${room}`, margin, y);
+        y += 6;
+
+        pdf.setTextColor(0);
+        pdf.text(`Leave Type: ${ltype}`, margin, y);
+        y += 5;
+
+        pdf.text(`Out: ${fmtDT(outISO)}`, margin, y);
+        y += 5;
+
+        pdf.text(`In:  ${fmtDT(inISO)}`, margin, y);
+        y += 5;
+
+        // Reason (wrapped)
+        const reasonLines = wrapText(`Reason: ${reason}`, pageW - margin*2);
+        reasonLines.forEach(line => {
+          if (y > 285){
+            pdf.addPage();
+            y = 16;
+          }
+          pdf.text(line, margin, y);
+          y += lineH;
+        });
+
+        // expired note not “status” — subtle (optional)
+        if (expired){
+          pdf.setTextColor(120);
+          pdf.setFontSize(9);
+          pdf.text(`Note: This leave has already ended (expired).`, margin, y);
+          pdf.setTextColor(0);
+          pdf.setFontSize(10);
+          y += 5;
+        }
+
+        y += 4;
+        pdf.setDrawColor(230);
+        pdf.line(margin, y, pageW - margin, y);
+        y += 8;
+      };
+
+      rows.forEach((r, i) => {
+        if (y > 270){
+          pdf.addPage();
+          y = 16;
+        }
+        addRowBlock(r, i+1);
+      });
+
+      // Footer summary (last page)
+      pdf.setFont("helvetica","bold");
+      pdf.setFontSize(10);
+      pdf.text(`Total Records: ${rows.length}`, margin, 292);
+
+      pdf.save(`Dean_Approved_Report_${from}_to_${to}${roll ? "_"+roll : ""}.pdf`);
+    }catch(err){
+      console.error(err);
+      alert("Report download failed. Check console.");
+    }finally{
+      repDownloadBtn.disabled = false;
+      repDownloadBtn.textContent = "Download PDF";
+    }
+  }
+
+  repDownloadBtn.addEventListener("click", downloadDeanReportPDF);
 
   /* ---------------- Cards ---------------- */
   function renderApprovalCard(r){
@@ -1226,8 +1506,6 @@ textarea:focus{
 
     try{
       await updateDoc(ref, updates);
-
-      // ✅ create public gatepass doc for QR / gatepass public page
       await upsertPublicGatepass(id, { ...r, ...updates });
 
       await loadDashboard();
