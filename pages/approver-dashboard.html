@@ -72,6 +72,7 @@ body{
 }
 .btn:hover{ transform: translateY(-1px); box-shadow: 0 16px 34px rgba(193,18,31,.25); }
 .btn:active{ transform: translateY(0px) scale(.99); }
+.btn:disabled{ opacity:.6; cursor:not-allowed; transform:none; box-shadow:none; }
 
 .wrap{ max-width:1200px; margin:auto; padding:20px 18px 28px; }
 
@@ -196,6 +197,7 @@ select:focus, input:focus{
   transition:.15s ease;
 }
 .applyBtn:hover{ transform: translateY(-1px); box-shadow: 0 16px 34px rgba(193,18,31,.22); }
+.applyBtn:disabled{ opacity:.6; cursor:not-allowed; transform:none; box-shadow:none; }
 
 .metrics{ display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; }
 @media(max-width: 1050px){ .metrics{ grid-template-columns: repeat(2, 1fr); } }
@@ -208,6 +210,123 @@ select:focus, input:focus{
 }
 .metric .k{ font-size:11px; color:var(--muted); font-weight:950; letter-spacing:.2px; }
 .metric .v{ margin-top:6px; font-size:24px; font-weight:1100; }
+
+/* ===== Reports Panel ===== */
+.reportsGrid{
+  margin-top:14px;
+  display:grid;
+  grid-template-columns: 1fr;
+  gap:14px;
+}
+.reportIntro{
+  color:var(--muted);
+  font-weight:800;
+  font-size:12.5px;
+  line-height:1.45;
+}
+.pills{
+  display:flex;
+  gap:10px;
+  flex-wrap:wrap;
+  margin:10px 0 12px;
+}
+.pill{
+  border:1px solid var(--line);
+  background:#fff;
+  padding:10px 12px;
+  border-radius:999px;
+  cursor:pointer;
+  font-weight:950;
+  font-size:13px;
+  transition:.15s ease;
+  box-shadow: 0 10px 22px rgba(2,6,23,.06);
+}
+.pill:hover{ transform: translateY(-1px); border-color: rgba(193,18,31,.35); }
+.pill.active{
+  background: rgba(193,18,31,.08);
+  border-color: rgba(193,18,31,.55);
+  color: var(--redDark);
+  box-shadow: 0 14px 28px rgba(193,18,31,.10);
+}
+
+.reportRow{
+  display:grid;
+  grid-template-columns: 1.2fr 1fr 1fr 1fr 170px;
+  gap:10px;
+}
+@media(max-width: 1100px){ .reportRow{ grid-template-columns: 1fr 1fr; } }
+
+.chipWrap{
+  border:1px solid var(--line);
+  border-radius:16px;
+  background:var(--soft);
+  padding:10px 12px;
+}
+.chipWrap .lbl{
+  display:block;
+  font-size:11px;
+  color:var(--muted);
+  font-weight:900;
+  letter-spacing:.2px;
+  margin-bottom:8px;
+}
+.chips{
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+}
+.chip{
+  user-select:none;
+  display:inline-flex;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  border-radius:999px;
+  border:1px solid var(--line);
+  background:#fff;
+  font-weight:950;
+  font-size:12.5px;
+  cursor:pointer;
+  transition:.12s ease;
+}
+.chip:hover{ transform: translateY(-1px); border-color: rgba(193,18,31,.35); }
+.chip input{ width:auto; }
+.chip.on{
+  background: rgba(193,18,31,.08);
+  border-color: rgba(193,18,31,.55);
+  color: var(--redDark);
+}
+
+.smallBtns{
+  display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+}
+.btnGhost{
+  border:1px solid var(--line);
+  background:#fff;
+  color:#0f172a;
+  border-radius:14px;
+  padding:10px 12px;
+  font-weight:950;
+  cursor:pointer;
+  transition:.15s ease;
+  box-shadow: 0 10px 22px rgba(2,6,23,.06);
+}
+.btnGhost:hover{ transform: translateY(-1px); border-color: rgba(193,18,31,.35); }
+
+.toast{
+  margin-top:12px;
+  border-radius:14px;
+  padding:10px 12px;
+  border:1px solid var(--line);
+  background:#fff;
+  display:none;
+  font-size:13px;
+  line-height:1.45;
+  font-weight:750;
+}
+.toast.show{ display:block; }
+.toast.good{ border-color: rgba(15,118,110,.25); background: rgba(15,118,110,.06); color:#0f3d39; }
+.toast.bad{ border-color: rgba(180,35,24,.22); background: rgba(180,35,24,.06); color:#5a1110; }
 
 /* Leave tabs */
 .leaveTabs{ display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
@@ -451,6 +570,75 @@ textarea:focus{
       </section>
 
     </div>
+
+    <!-- ✅ Reports Panel (on opening page) -->
+    <div class="reportsGrid">
+      <section class="panel">
+        <div class="panelHead">
+          <h3 class="panelTitle">Reports (Download PDF)</h3>
+          <div class="smallBtns">
+            <button class="btnGhost" id="repClear" type="button">Clear</button>
+          </div>
+        </div>
+        <div class="panelBody">
+          <div class="reportIntro">
+            Download a clean PDF of <b>Approved</b> requests (includes those that are now <b>Expired</b> based on IN time).
+            Reports are filtered by <b>IN datetime</b>.
+          </div>
+
+          <div class="pills">
+            <button class="pill active" id="repModeTime" type="button">Timeframe (All Approved by Me)</button>
+            <button class="pill" id="repModeStudent" type="button">Student-wise (Roll No + Timeframe)</button>
+          </div>
+
+          <div class="reportRow">
+            <div class="filterBox" id="repRollBox" style="display:none;">
+              <label>Student Roll No</label>
+              <input id="repRoll" type="text" placeholder="e.g., C08080" />
+            </div>
+
+            <div class="filterBox">
+              <label>From Date (IN)</label>
+              <input id="repFrom" type="date" />
+            </div>
+
+            <div class="filterBox">
+              <label>To Date (IN)</label>
+              <input id="repTo" type="date" />
+            </div>
+
+            <div class="filterBox">
+              <label>Year</label>
+              <select id="repYear">
+                <option value="all">All</option>
+                <option value="1">Year 1</option>
+                <option value="2">Year 2</option>
+              </select>
+            </div>
+
+            <button class="applyBtn" id="repDownload" type="button">Download PDF</button>
+          </div>
+
+          <div class="chipWrap" style="margin-top:10px;">
+            <span class="lbl">Leave Type (Multiple)</span>
+            <div class="chips" id="repTypes">
+              <label class="chip on" data-type="single"><input type="checkbox" checked> Single Day</label>
+              <label class="chip on" data-type="one"><input type="checkbox" checked> One Day</label>
+              <label class="chip on" data-type="extended"><input type="checkbox" checked> Extended Leave</label>
+            </div>
+          </div>
+
+          <div class="pills" style="margin-top:10px;">
+            <button class="pill" id="repPreset7" type="button">Last 7 Days</button>
+            <button class="pill" id="repPreset30" type="button">Last 30 Days</button>
+            <button class="pill" id="repPresetThisMonth" type="button">This Month</button>
+          </div>
+
+          <div id="repToast" class="toast"></div>
+        </div>
+      </section>
+    </div>
+
   </section>
 
   <section id="pageRequests" class="hidden">
@@ -483,6 +671,10 @@ textarea:focus{
 
 </div>
 
+<!-- PDF libs -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
@@ -492,7 +684,6 @@ textarea:focus{
   } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
   // ✅ IMPORTANT: prevent browser back/forward cache showing protected page after logout
-  // If page restored from bfcache, force reload so auth state is checked again.
   window.addEventListener("pageshow", (e) => {
     if (e.persisted) window.location.reload();
   });
@@ -556,6 +747,30 @@ textarea:focus{
   const cRejected = document.getElementById("cRejected");
 
   const requestsContainer = document.getElementById("requestsContainer");
+
+  // ===== Reports DOM =====
+  const repModeTime = document.getElementById("repModeTime");
+  const repModeStudent = document.getElementById("repModeStudent");
+  const repRollBox = document.getElementById("repRollBox");
+  const repRoll = document.getElementById("repRoll");
+  const repFrom = document.getElementById("repFrom");
+  const repTo = document.getElementById("repTo");
+  const repYear = document.getElementById("repYear");
+  const repTypes = document.getElementById("repTypes");
+  const repDownload = document.getElementById("repDownload");
+  const repToast = document.getElementById("repToast");
+  const repClear = document.getElementById("repClear");
+  const repPreset7 = document.getElementById("repPreset7");
+  const repPreset30 = document.getElementById("repPreset30");
+  const repPresetThisMonth = document.getElementById("repPresetThisMonth");
+
+  let repMode = "time"; // time | student
+
+  function showToast(el, msg, type="good"){
+    el.className = "toast show " + (type === "bad" ? "bad" : "good");
+    el.textContent = msg;
+  }
+  function clearToast(el){ el.className = "toast"; el.textContent = ""; }
 
   let currentUserEmailRaw = "";
   let currentUserEmailLower = "";
@@ -623,6 +838,21 @@ textarea:focus{
     return true;
   }
 
+  function inDateRangeInDT(row, fromDate, toDate){
+    const inDT = getInDT(row);
+    if (!inDT) return false;
+    const inn = String(inDT);
+    if (fromDate){
+      const fromISO = toStartOfDayISO(fromDate);
+      if (inn < fromISO) return false;
+    }
+    if (toDate){
+      const toISO = toEndOfDayISO(toDate);
+      if (inn > toISO) return false;
+    }
+    return true;
+  }
+
   function fmtDT(iso){
     const dt = new Date(iso);
     if (isNaN(dt)) return "-";
@@ -676,6 +906,13 @@ textarea:focus{
       const e = String(x?.email || "").trim();
       return e === meRaw || e.toLowerCase() === meLower;
     }) || null;
+  }
+
+  function didIApproveThis(chain){
+    const entry = chainEntryForMe(chain);
+    if (!entry) return false;
+    const st = String(entry.status || entry.action || "").toLowerCase();
+    return st === "approved";
   }
 
   function nextHolderEmail(chain){
@@ -907,6 +1144,7 @@ textarea:focus{
     cRejected.textContent = String(rejected);
   }
 
+  // ===== Photo helpers (unchanged) =====
   function extractDriveId(url){
     const u = String(url || "").trim();
     if (!u) return "";
@@ -1110,19 +1348,16 @@ textarea:focus{
     const payload = {
       status: "approved",
       approved_public_at: isoNow(),
-      // student identity
       student_name: requestRow.student_name || requestRow.student?.name || "",
       student_rollno: requestRow.student_rollno || requestRow.student?.rollno || "",
       student_room_no: requestRow.student_room_no || requestRow.student?.room || requestRow.student?.roomNo || "",
       student_email: requestRow.student_email || requestRow.studentEmail || requestRow.student?.email || "",
       student_uid: requestRow.student_uid || requestRow.studentUid || requestRow.student?.uid || "",
-      // leave info
       leave_type: requestRow.leave_type || "",
       out_datetime: outVal || "",
       in_datetime: inVal || "",
       reason: requestRow.reason || "",
       contact_no: requestRow.contact_no || requestRow.phone || requestRow.contact || "",
-      // optional photo link if present
       photo_url: requestRow.photo_url || requestRow.photoUrl || requestRow.student_photo_url || "",
       updatedAt: serverTimestamp(),
       updated_at: serverTimestamp()
@@ -1205,9 +1440,7 @@ textarea:focus{
     try{
       await updateDoc(doc(db, "leave_requests", requestId), updates);
 
-      // ✅ Create public gatepass doc ONLY on final approval
       if (isFinalApproved){
-        // Use latest data we have (r + updates). r has all student fields already.
         await upsertPublicGatepass(requestId, { ...r, ...updates });
       }
 
@@ -1269,7 +1502,6 @@ textarea:focus{
 
   logoutBtn.addEventListener("click", async () => {
     try{ await signOut(auth); }catch(_){}
-    // ✅ Use replace so back button doesn't bring dashboard
     window.location.replace("../index.html");
   });
 
@@ -1305,9 +1537,344 @@ textarea:focus{
   sApproved.addEventListener("click", () => { setStatusTab("approved"); updateStatusCounts(); renderRequests(); });
   sRejected.addEventListener("click", () => { setStatusTab("rejected"); updateStatusCounts(); renderRequests(); });
 
+  // ===== Reports UI behavior =====
+  function setRepMode(mode){
+    repMode = mode;
+    repModeTime.classList.toggle("active", mode === "time");
+    repModeStudent.classList.toggle("active", mode === "student");
+    repRollBox.style.display = (mode === "student") ? "block" : "none";
+    clearToast(repToast);
+  }
+  repModeTime.addEventListener("click", () => setRepMode("time"));
+  repModeStudent.addEventListener("click", () => setRepMode("student"));
+
+  function setChip(el, on){
+    el.classList.toggle("on", !!on);
+    const cb = el.querySelector("input[type=checkbox]");
+    if (cb) cb.checked = !!on;
+  }
+
+  repTypes.querySelectorAll(".chip").forEach(ch => {
+    ch.addEventListener("click", (e) => {
+      // allow clicking label without double toggling
+      if (e.target && e.target.tagName === "INPUT") return;
+      const cb = ch.querySelector("input[type=checkbox]");
+      const next = !(cb && cb.checked);
+      setChip(ch, next);
+      clearToast(repToast);
+    });
+    // sync initial
+    const cb = ch.querySelector("input[type=checkbox]");
+    setChip(ch, cb ? cb.checked : true);
+  });
+
+  function getSelectedReportTypes(){
+    const types = [];
+    repTypes.querySelectorAll(".chip").forEach(ch => {
+      const t = ch.dataset.type;
+      const cb = ch.querySelector("input[type=checkbox]");
+      if (cb && cb.checked && t) types.push(t);
+    });
+    return types;
+  }
+
+  function todayDateStr(){
+    const d = new Date();
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth()+1).padStart(2,"0");
+    const dd = String(d.getDate()).padStart(2,"0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function addDays(dateObj, days){
+    const d = new Date(dateObj);
+    d.setDate(d.getDate() + days);
+    return d;
+  }
+
+  function dateToStr(d){
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth()+1).padStart(2,"0");
+    const dd = String(d.getDate()).padStart(2,"0");
+    return `${yyyy}-${mm}-${dd}`;
+  }
+
+  function applyPreset(days){
+    const now = new Date();
+    const from = addDays(now, -days);
+    repFrom.value = dateToStr(from);
+    repTo.value = todayDateStr();
+    clearToast(repToast);
+  }
+
+  repPreset7.addEventListener("click", () => applyPreset(7));
+  repPreset30.addEventListener("click", () => applyPreset(30));
+  repPresetThisMonth.addEventListener("click", () => {
+    const now = new Date();
+    const first = new Date(now.getFullYear(), now.getMonth(), 1);
+    repFrom.value = dateToStr(first);
+    repTo.value = todayDateStr();
+    clearToast(repToast);
+  });
+
+  repClear.addEventListener("click", () => {
+    repFrom.value = "";
+    repTo.value = "";
+    repYear.value = "all";
+    repRoll.value = "";
+    // turn on all
+    repTypes.querySelectorAll(".chip").forEach(ch => setChip(ch, true));
+    setRepMode("time");
+    clearToast(repToast);
+  });
+
+  function leaveTypeLabel(t){
+    if (t === "single") return "Single Day";
+    if (t === "one") return "One Day";
+    if (t === "extended") return "Extended Leave";
+    return String(t || "").toUpperCase();
+  }
+
+  function isExpired(row){
+    const inVal = getInDT(row);
+    const d = new Date(String(inVal || ""));
+    if (!inVal || isNaN(d)) return false;
+    return new Date() > d;
+  }
+
+  function getStudentYear(row){
+    return String(row.student_year ?? row.studentYear ?? row.student?.year ?? row.student?.yearNo ?? row.student?.year_no ?? "").trim();
+  }
+
+  // ===== Reports data fetch + PDF build =====
+  async function fetchApprovedRowsForReport({ fromDate, toDate, year, types, roll }){
+    // Query on APPROVED only + IN datetime range + I am in approver_emails
+    // Then filter by "I approved in chain" + year + types + roll.
+    const meLower = currentUserEmailLower;
+
+    const fromISO = toStartOfDayISO(fromDate);
+    const toISO = toEndOfDayISO(toDate);
+
+    // Firestore requires range filters only if values exist.
+    // If no date provided, we still fetch a safe window to avoid pulling everything.
+    // You asked instant download; so date is required.
+    if (!fromDate || !toDate) throw new Error("Please select From & To dates (IN datetime).");
+
+    const baseQ = query(
+      collection(db, "leave_requests"),
+      where("approver_emails", "array-contains", meLower),
+      where("status", "==", "approved"),
+      where("in_datetime", ">=", fromISO),
+      where("in_datetime", "<=", toISO)
+    );
+
+    const snap = await getDocs(baseQ);
+    let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+    // Must be approved BY ME (stage wise)
+    rows = rows.filter(r => didIApproveThis(r.approver_chain));
+
+    // Year filter
+    if (year && year !== "all"){
+      rows = rows.filter(r => String(getStudentYear(r)) === String(year));
+    }
+
+    // Leave type filter (multi)
+    if (Array.isArray(types) && types.length){
+      rows = rows.filter(r => types.includes(String(r.leave_type || "")));
+    }
+
+    // Roll filter (student mode)
+    if (roll){
+      const rr = normalizeRollno(roll);
+      rows = rows.filter(r => normalizeRollno(r.student_rollno || r.student?.rollno || "") === rr);
+    }
+
+    // Sort by IN datetime
+    rows.sort((a,b) => String(getInDT(a)||"").localeCompare(String(getInDT(b)||"")));
+    return rows;
+  }
+
+  function buildReportFilename({ mode, fromDate, toDate, roll }){
+    const role = (roleType === "dean") ? "Dean" : "Approver";
+    const base = `${role}_Report_${fromDate}_to_${toDate}`;
+    if (mode === "student" && roll) return `${base}_${normalizeRollno(roll)}.pdf`;
+    return `${base}.pdf`;
+  }
+
+  function buildPDF({ rows, mode, fromDate, toDate, year, types, roll }){
+    const { jsPDF } = window.jspdf;
+    const docPDF = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
+
+    const pageW = docPDF.internal.pageSize.getWidth();
+
+    // Header
+    docPDF.setFont("helvetica", "bold");
+    docPDF.setFontSize(14);
+    docPDF.text("Xavier Institute of Management and Entrepreneurship (XIME)", 40, 42);
+
+    docPDF.setFontSize(12);
+    docPDF.setTextColor(193, 18, 31);
+    docPDF.text("Leave Management System — Approved Requests Report", 40, 62);
+    docPDF.setTextColor(15, 23, 42);
+
+    // top line
+    docPDF.setDrawColor(193, 18, 31);
+    docPDF.setLineWidth(2);
+    docPDF.line(40, 74, pageW - 40, 74);
+
+    // Meta
+    docPDF.setFont("helvetica", "normal");
+    docPDF.setFontSize(10);
+    const genAt = new Date().toLocaleString();
+    const who = `${apName.textContent || "Approver"} (${currentUserEmailRaw})`;
+
+    const typeText = (types && types.length) ? types.map(leaveTypeLabel).join(", ") : "All";
+    const yearText = (year && year !== "all") ? `Year ${year}` : "All Years";
+
+    const lines = [
+      `Prepared by: ${who}`,
+      `Generated: ${genAt}`,
+      `IN datetime range: ${fromDate} to ${toDate}`,
+      `Leave Types: ${typeText}`,
+      `Year Filter: ${yearText}`,
+      mode === "student" ? `Student Roll No: ${normalizeRollno(roll || "")}` : `Mode: Timeframe (All Approved by Me)`,
+    ];
+
+    let y = 92;
+    lines.forEach((t) => {
+      docPDF.text(t, 40, y);
+      y += 14;
+    });
+
+    // Summary counts
+    const expiredCount = rows.filter(isExpired).length;
+    docPDF.setFont("helvetica", "bold");
+    docPDF.text(`Total Records: ${rows.length}    Expired (derived): ${expiredCount}`, 40, y + 6);
+    docPDF.setFont("helvetica", "normal");
+
+    // Table
+    const tableBody = rows.map((r, idx) => {
+      const studentName = r.student_name || r.student?.name || "";
+      const rollno = normalizeRollno(r.student_rollno || r.student?.rollno || "");
+      const yearVal = getStudentYear(r) || "";
+      const hostel = String(r.student_hostel || r.student?.hostel || "").trim();
+      const room = String(r.student_room_no || r.student?.room || r.student?.roomNo || "").trim();
+      const outVal = getOutDT(r);
+      const inVal  = getInDT(r);
+      const leaveT = leaveTypeLabel(r.leave_type);
+      const contact = String(r.contact_no || r.phone || r.contact || "").trim();
+      const reason = String(r.reason || "").trim();
+
+      return [
+        String(idx + 1),
+        rollno || "—",
+        studentName || "—",
+        yearVal || "—",
+        hostel || "—",
+        room || "—",
+        fmtDT(outVal),
+        fmtDT(inVal),
+        leaveT || "—",
+        contact || "—",
+        reason || "—"
+      ];
+    });
+
+    docPDF.autoTable({
+      startY: y + 18,
+      head: [[
+        "S.No", "Roll No", "Student Name", "Year", "Hostel", "Room",
+        "Out Date & Time", "In Date & Time", "Leave Type", "Contact", "Reason"
+      ]],
+      body: tableBody,
+      styles: { font: "helvetica", fontSize: 8, cellPadding: 4, overflow: "linebreak" },
+      headStyles: { fillColor: [193, 18, 31], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { left: 40, right: 40 },
+      theme: "striped",
+      didDrawPage: (data) => {
+        const pageCount = docPDF.internal.getNumberOfPages();
+        const pageCurrent = docPDF.internal.getCurrentPageInfo().pageNumber;
+        docPDF.setFontSize(9);
+        docPDF.setTextColor(100);
+        docPDF.text(`Page ${pageCurrent} of ${pageCount}`, pageW - 90, docPDF.internal.pageSize.getHeight() - 20);
+        docPDF.setTextColor(15, 23, 42);
+      }
+    });
+
+    // Footer / signature block
+    const lastY = docPDF.lastAutoTable.finalY || (y + 40);
+    const signY = Math.min(lastY + 26, docPDF.internal.pageSize.getHeight() - 90);
+
+    docPDF.setDrawColor(226, 232, 240);
+    docPDF.setLineWidth(1);
+    docPDF.line(40, signY, pageW - 40, signY);
+
+    docPDF.setFont("helvetica", "bold");
+    docPDF.setFontSize(10);
+    docPDF.text("Signature", 40, signY + 18);
+
+    docPDF.setFont("helvetica", "normal");
+    docPDF.setFontSize(9);
+    docPDF.setTextColor(100);
+    docPDF.text("Note: This report includes Approved requests. Expired is derived from IN datetime.", 40, signY + 36);
+    docPDF.setTextColor(15, 23, 42);
+
+    return docPDF;
+  }
+
+  repDownload.addEventListener("click", async () => {
+    clearToast(repToast);
+
+    try{
+      repDownload.disabled = true;
+
+      const fromDate = repFrom.value || "";
+      const toDate = repTo.value || "";
+      const year = repYear.value || "all";
+      const types = getSelectedReportTypes();
+      const roll = repMode === "student" ? (repRoll.value || "") : "";
+
+      if (!types.length){
+        showToast(repToast, "Select at least one Leave Type.", "bad");
+        return;
+      }
+
+      if (repMode === "student"){
+        if (!roll.trim()){
+          showToast(repToast, "Enter Student Roll No for Student-wise report.", "bad");
+          return;
+        }
+      }
+
+      showToast(repToast, "Preparing report…", "good");
+
+      const rows = await fetchApprovedRowsForReport({ fromDate, toDate, year, types, roll });
+
+      if (!rows.length){
+        showToast(repToast, "No approved records found for the selected filters.", "bad");
+        return;
+      }
+
+      const pdf = buildPDF({ rows, mode: repMode, fromDate, toDate, year, types, roll });
+      const filename = buildReportFilename({ mode: repMode, fromDate, toDate, roll });
+
+      pdf.save(filename);
+
+      showToast(repToast, "Downloaded successfully ✅", "good");
+
+    }catch(err){
+      console.error(err);
+      // If index missing, Firebase throws a message with index link in console.
+      showToast(repToast, err?.message || "Unable to generate report. Check Firestore permissions / indexes.", "bad");
+    }finally{
+      repDownload.disabled = false;
+    }
+  });
+
   onAuthStateChanged(auth, async (u) => {
     if (!u){
-      // ✅ replace to stop back button re-opening this page
       window.location.replace("../index.html");
       return;
     }
@@ -1334,6 +1901,13 @@ textarea:focus{
 
       setLeaveTypeTab(canBC ? "single" : "one");
       setStatusTab("pending");
+
+      // default report dates: this month
+      const now = new Date();
+      const first = new Date(now.getFullYear(), now.getMonth(), 1);
+      repFrom.value = dateToStr(first);
+      repTo.value = todayDateStr();
+      setRepMode("time");
 
       await refreshCache();
       computeDashboardMetrics();
