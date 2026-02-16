@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>XIME — Guard Gate Code</title>
+  <style>
+    :root{
+      --red:#c1121f;
+      --ink:#111827;
+      --muted:#6b7280;
+      --line:#e5e7eb;
+      --card:#ffffff;
+      --soft:#f9fafb;
+      --shadow:0 18px 50px rgba(17,24,39,.10);
+      --radius:18px;
+      --font: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:var(--font);
+      background:
+        radial-gradient(1100px 520px at 20% 0%, rgba(193,18,31,.08), transparent 60%),
+        radial-gradient(900px 520px at 100% 20%, rgba(17,24,39,.06), transparent 60%),
+        #f6f7fb;
+      color:var(--ink);
+      min-height:100vh;
+      display:flex;
+      align-items:center;
+      justify-content:center;
+      padding:24px;
+    }
+    .wrap{width:min(760px, 100%);}
+    .brand{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      margin-bottom:14px;
+    }
+    .brand h1{
+      margin:0;
+      font-size:20px;
+      letter-spacing:.2px;
+    }
+    .pill{
+      border:1px solid var(--line);
+      background:rgba(255,255,255,.7);
+      padding:8px 12px;
+      border-radius:999px;
+      font-size:13px;
+      color:var(--muted);
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--line);
+      box-shadow:var(--shadow);
+      border-radius:var(--radius);
+      padding:22px;
+    }
+    .title{
+      display:flex;
+      align-items:flex-start;
+      justify-content:space-between;
+      gap:14px;
+      margin-bottom:10px;
+    }
+    .title h2{
+      margin:0;
+      font-size:22px;
+    }
+    .sub{
+      margin:6px 0 0;
+      color:var(--muted);
+      font-size:14px;
+      line-height:1.4;
+    }
+    .codeBox{
+      margin-top:18px;
+      background:var(--soft);
+      border:1px dashed #d1d5db;
+      border-radius:16px;
+      padding:18px;
+      display:flex;
+      flex-direction:column;
+      gap:10px;
+      align-items:center;
+      justify-content:center;
+      text-align:center;
+    }
+    .code{
+      font-size:56px;
+      letter-spacing:10px;
+      font-weight:800;
+      color:var(--red);
+      line-height:1;
+      user-select:all;
+    }
+    .meta{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      justify-content:center;
+      color:var(--muted);
+      font-size:14px;
+    }
+    .dot{
+      width:6px;height:6px;border-radius:50%;
+      background:var(--line);
+      display:inline-block;
+      margin:0 4px;
+      transform:translateY(-1px);
+    }
+    .status{
+      margin-top:14px;
+      padding:12px 14px;
+      border-radius:14px;
+      border:1px solid var(--line);
+      font-size:14px;
+      color:var(--muted);
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+    }
+    .badge{
+      padding:6px 10px;
+      border-radius:999px;
+      border:1px solid var(--line);
+      font-size:12px;
+      color:var(--muted);
+      background:#fff;
+      white-space:nowrap;
+    }
+    .bad{ color:#b42318; border-color:rgba(180,35,24,.25); background:rgba(180,35,24,.06); }
+    .good{ color:#0f766e; border-color:rgba(15,118,110,.25); background:rgba(15,118,110,.06); }
+    .btnRow{ margin-top:14px; display:flex; gap:10px; flex-wrap:wrap; }
+    .btn{
+      appearance:none;
+      border:none;
+      border-radius:14px;
+      padding:12px 14px;
+      font-weight:700;
+      cursor:pointer;
+      background:var(--red);
+      color:#fff;
+      box-shadow:0 10px 24px rgba(193,18,31,.18);
+    }
+    .btn:active{ transform:translateY(1px); }
+    .btn.secondary{
+      background:#fff;
+      color:var(--ink);
+      border:1px solid var(--line);
+      box-shadow:none;
+      font-weight:600;
+    }
+    footer{
+      margin-top:12px;
+      color:var(--muted);
+      font-size:12px;
+      text-align:center;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="brand">
+      <h1>XIME Leave System — Guard</h1>
+      <div class="pill">Read-only • Rotating Gate Code</div>
+    </div>
+
+    <div class="card">
+      <div class="title">
+        <div>
+          <h2>Gate Code</h2>
+          <p class="sub">Students will enter this code on their Leave History to confirm “Reached College”.</p>
+        </div>
+        <div class="badge" id="rotateInfo">Rotation: —</div>
+      </div>
+
+      <div class="codeBox">
+        <div class="code" id="code">— — — — — —</div>
+        <div class="meta">
+          <span id="countdown">Remaining: —</span>
+          <span class="dot"></span>
+          <span id="lastSync">Last sync: —</span>
+        </div>
+      </div>
+
+      <div class="status" id="status">
+        <span id="statusText">Waiting for backend…</span>
+        <span class="badge bad" id="statusBadge">OFFLINE</span>
+      </div>
+
+      <div class="btnRow">
+        <button class="btn" id="refreshBtn">Refresh Now</button>
+        <button class="btn secondary" id="copyBtn">Copy Code</button>
+      </div>
+
+      <footer>
+        Keep this page open. It auto-refreshes the code.
+      </footer>
+    </div>
+  </div>
+
+<script>
+  // ✅ Replace this once your Vercel backend is deployed:
+  const VERCEL_BASE = "https://YOUR-VERCEL-APP.vercel.app";
+
+  const els = {
+    code: document.getElementById("code"),
+    countdown: document.getElementById("countdown"),
+    lastSync: document.getElementById("lastSync"),
+    status: document.getElementById("status"),
+    statusText: document.getElementById("statusText"),
+    statusBadge: document.getElementById("statusBadge"),
+    rotateInfo: document.getElementById("rotateInfo"),
+    refreshBtn: document.getElementById("refreshBtn"),
+    copyBtn: document.getElementById("copyBtn"),
+  };
+
+  let remainingSeconds = null;
+  let validForSeconds = null;
+  let ticker = null;
+  let lastCode = "";
+
+  function fmtTime(ts){
+    try{
+      return new Date(ts).toLocaleTimeString([], {hour:"2-digit", minute:"2-digit", second:"2-digit"});
+    }catch(e){ return "—"; }
+  }
+
+  function setOnline(ok, msg){
+    if(ok){
+      els.statusText.textContent = msg || "Live";
+      els.statusBadge.textContent = "ONLINE";
+      els.statusBadge.classList.remove("bad");
+      els.statusBadge.classList.add("good");
+    }else{
+      els.statusText.textContent = msg || "Offline";
+      els.statusBadge.textContent = "OFFLINE";
+      els.statusBadge.classList.remove("good");
+      els.statusBadge.classList.add("bad");
+    }
+  }
+
+  function renderCode(code){
+    lastCode = String(code || "").trim();
+    if(lastCode && /^\d{6}$/.test(lastCode)){
+      els.code.textContent = lastCode.split("").join(" ");
+    }else{
+      els.code.textContent = "— — — — — —";
+    }
+  }
+
+  function startCountdown(){
+    if(ticker) clearInterval(ticker);
+    ticker = setInterval(() => {
+      if(typeof remainingSeconds === "number"){
+        remainingSeconds = Math.max(0, remainingSeconds - 1);
+        els.countdown.textContent = `Remaining: ${remainingSeconds}s`;
+      }else{
+        els.countdown.textContent = "Remaining: —";
+      }
+    }, 1000);
+  }
+
+  async function fetchGateCode(){
+    try{
+      setOnline(false, "Connecting to OTP engine…");
+      const url = `${VERCEL_BASE}/api/gateCode`;
+      const res = await fetch(url, { method:"GET" });
+      if(!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const data = await res.json();
+      // expected:
+      // { code: "123456", validForSeconds: 60 or 300, remainingSeconds: 42, serverTime: <optional> }
+      renderCode(data.code);
+      validForSeconds = data.validForSeconds ?? null;
+      remainingSeconds = data.remainingSeconds ?? null;
+
+      els.rotateInfo.textContent = `Rotation: ${validForSeconds ? validForSeconds + "s" : "—"}`;
+      els.lastSync.textContent = `Last sync: ${fmtTime(Date.now())}`;
+
+      setOnline(true, "Code is live");
+      startCountdown();
+    }catch(err){
+      renderCode("");
+      els.rotateInfo.textContent = "Rotation: —";
+      els.lastSync.textContent = `Last sync: ${fmtTime(Date.now())}`;
+      setOnline(false, `Backend not ready (${err.message}).`);
+      // keep countdown running but show —
+      remainingSeconds = null;
+      startCountdown();
+    }
+  }
+
+  // Buttons
+  els.refreshBtn.addEventListener("click", fetchGateCode);
+  els.copyBtn.addEventListener("click", async () => {
+    if(!lastCode || !/^\d{6}$/.test(lastCode)) return alert("No valid code to copy.");
+    try{
+      await navigator.clipboard.writeText(lastCode);
+      alert("Copied!");
+    }catch(e){
+      alert("Copy failed. (Clipboard permissions)");
+    }
+  });
+
+  // Auto refresh:
+  // - fetch once immediately
+  // - then re-fetch every 15 seconds (lightweight)
+  fetchGateCode();
+  setInterval(fetchGateCode, 15000);
+</script>
+</body>
+</html>
