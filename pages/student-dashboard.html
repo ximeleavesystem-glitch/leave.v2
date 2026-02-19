@@ -1400,7 +1400,12 @@ if (!currentUser?.uid){
   showToast(toastLeave, "Auth not ready. Please refresh and try again.", "bad");
   return;
 }
-console.log("UID:", currentUser?.uid, "EMAIL:", studentEmailLower, "STATUS:", payload.status);
+console.log("AUTH UID:", auth.currentUser?.uid);
+console.log("AUTH EMAIL:", auth.currentUser?.email);
+console.log("PAYLOAD UID:", payload.student_uid);
+console.log("PAYLOAD EMAIL:", payload.student_email);
+console.log("PAYLOAD STATUS:", payload.status);
+
 
         await addDoc(collection(db, "leave_requests"), payload);
 
@@ -1458,6 +1463,7 @@ console.log("UID:", currentUser?.uid, "EMAIL:", studentEmailLower, "STATUS:", pa
   </script>
 </body>
 </html>
+
 
 
 
