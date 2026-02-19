@@ -1400,6 +1400,7 @@ if (!currentUser?.uid){
   showToast(toastLeave, "Auth not ready. Please refresh and try again.", "bad");
   return;
 }
+console.log("UID:", currentUser?.uid, "EMAIL:", studentEmailLower, "STATUS:", payload.status);
 
         await addDoc(collection(db, "leave_requests"), payload);
 
@@ -1457,6 +1458,7 @@ if (!currentUser?.uid){
   </script>
 </body>
 </html>
+
 
 
 
