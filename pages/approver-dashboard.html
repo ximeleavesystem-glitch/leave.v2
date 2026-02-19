@@ -1091,44 +1091,51 @@ textarea:focus{
 
   // ===== Cache refresh (new statuses) =====
   async function refreshCache(){
-    const meLower = currentUserEmailLower;
-    const meRaw = currentUserEmailRaw;
+  const meLower = currentUserEmailLower;
+  const meRaw = currentUserEmailRaw;
 
-    // Pending assigned to me
-    const qPendingLower = query(collection(db, "leave_requests"),
-      where("current.holder_email", "==", meLower)
-    );
-    const qPendingRaw = query(collection(db, "leave_requests"),
-      where("current.holder_email", "==", meRaw)
-    );
-    const pendingRows = await tryGetDocs(qPendingLower, qPendingRaw);
+  // ✅ Pending assigned to me (query using current_holder_email)
+  const qHoldLower = query(
+    collection(db, "leave_requests"),
+    where("current_holder_email", "==", meLower)
+  );
+  const qHoldRaw = query(
+    collection(db, "leave_requests"),
+    where("current_holder_email", "==", meRaw)
+  );
 
-    // All my-involved (history)
-    const qMineLower = query(collection(db, "leave_requests"),
-      where("approver_emails", "array-contains", meLower)
-    );
-    const qMineRaw = query(collection(db, "leave_requests"),
-      where("approver_emails", "array-contains", meRaw)
-    );
-    let mineAll = [];
-    try { mineAll = await tryGetDocs(qMineLower, qMineRaw); }
-    catch(e){ mineAll = []; }
+  // Pull assigned docs then filter pending in JS (avoids Firestore "in" index problems)
+  const assignedAll = await tryGetDocs(qHoldLower, qHoldRaw);
+  const pendingRows = assignedAll.filter(r => {
+    const st = String(r.status || "").toLowerCase();
+    return st === "pending_l1" || st === "pending_dean";
+  });
 
-    // Keep:
-    // - pending for me
-    // - anything where I approved/rejected
-    // - anything escalated (requested true) where I'm in chain (for escalated history)
-    const actedOrEscalated = mineAll.filter(r => {
-      const acted = didIAct(r.approver_chain);
-      if (acted) return true;
-      if (r?.escalation?.requested) return true;
-      return false;
-    });
+  // ✅ All my-involved (history)
+  const qMineLower = query(
+    collection(db, "leave_requests"),
+    where("approver_emails", "array-contains", meLower)
+  );
+  const qMineRaw = query(
+    collection(db, "leave_requests"),
+    where("approver_emails", "array-contains", meRaw)
+  );
 
-    const map = new Map();
-    [...pendingRows, ...actedOrEscalated].forEach(r => map.set(r.id, r));
-    cacheAllForApprover = [...map.values()];
-  }
+  let mineAll = [];
+  try { mineAll = await tryGetDocs(qMineLower, qMineRaw); }
+  catch(e){ mineAll = []; }
+
+  const actedOrEscalated = mineAll.filter(r => {
+    const acted = didIAct(r.approver_chain);
+    if (acted) return true;
+    if (r?.escalation?.requested) return true;
+    return false;
+  });
+
+  const map = new Map();
+  [...pendingRows, ...actedOrEscalated].forEach(r => map.set(r.id, r));
+  cacheAllForApprover = [...map.values()];
+}
 
   function computeDashboardMetrics(){
     const meLower = currentUserEmailLower;
@@ -1982,3 +1989,4 @@ textarea:focus{
 </script>
 </body>
 </html>
+
