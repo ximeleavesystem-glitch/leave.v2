@@ -1323,77 +1323,74 @@ if (hasActiveSameGroup){
         l1_email = normalizeEmail(l1_email);
         if (!l1_email) throw new Error("Approver mapping missing (L1). Check approvers collection.");
 
+       
         const payload = {
-          // student snapshot
-          student_uid: currentUser?.uid || "",
-          student_rollno: studentRoll,
-          student_name: student.name || "",
-          student_email: studentEmailLower,
-          student_year: Number(year) || year,
-          student_hostel: hostel,
-          student_room_no: roomVal,
-          student_photo_url: student.student_photo_url || student.photo_url || "",
+  student_uid: auth.currentUser?.uid || "",   // ✅ fixed
+  student_rollno: studentRoll,
+  student_name: student.name || "",
+  student_email: studentEmailLower,
+  student_year: Number(year) || year,
+  student_hostel: hostel,
+  student_room_no: roomVal,
+  student_photo_url: student.student_photo_url || student.photo_url || "",
 
-          // form fields
-          reason_category: cat,
-          reason_text: reasonVal,
-          out_datetime: Timestamp.fromDate(outDate),
-          in_datetime: Timestamp.fromDate(inDate),
-          contact_no: phoneVal,
+  reason_category: cat,
+  reason_text: reasonVal,
+  out_datetime: Timestamp.fromDate(outDate),
+  in_datetime: Timestamp.fromDate(inDate),
+  contact_no: phoneVal,
 
-          // routing snapshot
-          routing: {
-            out_day_group,
-            out_window,
-            l1_role,
-            l1_email,
-            dean_email: DEAN_EMAIL,
-            policy_version: 2
-          },
+  routing: {
+    out_day_group,
+    out_window,
+    l1_role,
+    l1_email,
+    dean_email: DEAN_EMAIL,
+    policy_version: 2
+  },
 
-          // workflow
-          status: "pending_l1",
-          current: {
-            stage: "L1",
-            holder_role: l1_role,
-            holder_email: l1_email
-          },
-          // 🔥 compatibility for approver dashboard + rules
-current_holder_email: l1_email,
-approver_emails: [l1_email],
+  status: "pending_l1",
+  current: {
+    stage: "L1",
+    holder_role: l1_role,
+    holder_email: l1_email
+  },
 
+  // ✅ ADD THESE (super important)
+  current_holder_email: l1_email,
+  approver_emails: [l1_email],
 
-          escalation: {
-            requested: false,
-            requested_by: "",
-            requested_at: null,
-            reason: "",
-            dean_action: "not_required"
-          },
+  escalation: {
+    requested: false,
+    requested_by: "",
+    requested_at: null,
+    reason: "",
+    dean_action: "not_required"
+  },
 
-          approver_chain: [
-            {
-              stage: 1,
-              role: l1_role,
-              email: l1_email,
-              action: "pending",
-              acted_at: null,
-              remark: ""
-            }
-          ],
+  approver_chain: [
+    {
+      stage: 1,
+      role: l1_role,
+      email: l1_email,
+      action: "pending",
+      acted_at: null,
+      remark: ""
+    }
+  ],
 
-          arrival: {
-            verified: false,
-            attempted_at: null,
-            verified_at: null,
-            actual_in_time: null,
-            code_last_status: "",
-            late_minutes: null
-          },
+  arrival: {
+    verified: false,
+    attempted_at: null,
+    verified_at: null,
+    actual_in_time: null,
+    code_last_status: "",
+    late_minutes: null
+  },
 
-          created_at: serverTimestamp(),
-          updated_at: serverTimestamp()
-        };
+  created_at: serverTimestamp(),
+  updated_at: serverTimestamp()
+};
 
         await addDoc(collection(db, "leave_requests"), payload);
 
@@ -1451,6 +1448,7 @@ approver_emails: [l1_email],
   </script>
 </body>
 </html>
+
 
 
 
