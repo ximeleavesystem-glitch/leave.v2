@@ -1358,6 +1358,10 @@ if (hasActiveSameGroup){
             holder_role: l1_role,
             holder_email: l1_email
           },
+          // 🔥 compatibility for approver dashboard + rules
+current_holder_email: l1_email,
+approver_emails: [l1_email],
+
 
           escalation: {
             requested: false,
@@ -1447,5 +1451,6 @@ if (hasActiveSameGroup){
   </script>
 </body>
 </html>
+
 
 
