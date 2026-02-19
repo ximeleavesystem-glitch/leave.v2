@@ -1333,6 +1333,7 @@ if (hasActiveSameGroup){
   student_hostel: hostel,
   student_room_no: roomVal,
   student_photo_url: student.student_photo_url || student.photo_url || "",
+  student_email_raw: (auth.currentUser?.email || "").trim(),
 
   reason_category: cat,
   reason_text: reasonVal,
@@ -1448,6 +1449,7 @@ if (hasActiveSameGroup){
   </script>
 </body>
 </html>
+
 
 
 
