@@ -737,15 +737,12 @@
       return (status || "PENDING").toString().toUpperCase();
     }
 
-    function computeOutDayGroup(outDate){
-      // OUT datetime rules:
-      // Fri -> weekend_block
-      // Sat -> weekend_block
-      // Sun -> weekend_block (for day), but we store group using day (Fri/Sat/Sun) intent
-      const dow = outDate.getDay(); // 0 Sun .. 6 Sat
-      if (dow === 5 || dow === 6 || dow === 0) return "weekend_block";
-      return "weekday";
-    }
+   function computeOutDayGroup(outDate){
+  const dow = outDate.getDay(); // 0 Sun .. 6 Sat
+  // Weekend request counter & weekday/weekend blocking should only apply to Fri + Sat out-times
+  if (dow === 5 || dow === 6) return "weekend_block";
+  return "weekday";
+}
 
     function computeL1Role(outDate){
       // 6:00 PM EXACT = BC
@@ -1209,6 +1206,36 @@
         showToast(toastHistory, "Unable to load history.", "bad");
       }
     }
+    async function hasActiveRequestInSameGroup(studentEmail, outDayGroup){
+  // Active = pending OR approved but arrival not verified yet
+  const q1 = query(
+    collection(db, "leave_requests"),
+    where("student_email", "==", studentEmail),
+    where("routing.out_day_group", "==", outDayGroup),
+    limit(250)
+  );
+
+  const snap = await getDocs(q1);
+  if (snap.empty) return false;
+
+  for (const d of snap.docs){
+    const r = d.data() || {};
+    const st = String(r.status || "").toLowerCase();
+
+    const isPending = (st === "pending_l1" || st === "pending_dean");
+    const isApproved = (st === "approved_final" || st === "approved_dean_final");
+
+    if (isPending) return true;
+
+    if (isApproved){
+      const verified = !!(r.arrival && r.arrival.verified);
+      if (!verified) return true;  // block until arrival verified
+    }
+  }
+
+  return false;
+}
+
 
     // ===== Submit leave (NEW SCHEMA) =====
     leaveForm.addEventListener("submit", async (e) => {
@@ -1264,6 +1291,15 @@
         const out_day_group = computeOutDayGroup(outDate);
         const out_window = computeOutWindow(outDate);
         const l1_role = computeL1Role(outDate);
+// ✅ Block multiple active requests in the SAME group (weekday vs weekend)
+const hasActiveSameGroup = await hasActiveRequestInSameGroup(studentEmailLower, out_day_group);
+if (hasActiveSameGroup){
+  const msg = (out_day_group === "weekend_block")
+    ? "You already have an active WEEKEND request. Submit a new weekend request only after your return is verified."
+    : "You already have an active WEEKDAY request. Submit a new weekday request only after your return is verified.";
+  showToast(toastLeave, msg, "bad");
+  return;
+}
 
         // Resolve emails from approvers collection (fallback to hardcoded if missing)
         let l1_email = "";
@@ -1402,3 +1438,4 @@
   </script>
 </body>
 </html>
+
