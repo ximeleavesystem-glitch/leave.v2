@@ -297,7 +297,7 @@
 
     .field{ display:flex; flex-direction:column; gap:6px; margin-bottom:10px; }
     label{ font-size:12px; color:var(--muted); font-weight:750; }
-    input, textarea{
+    input, textarea, select{
       border:1px solid var(--line);
       background:#fff;
       color:var(--ink);
@@ -309,48 +309,12 @@
       font-family:var(--font);
     }
     textarea{ min-height:92px; resize:vertical; }
-    input:focus, textarea:focus{
+    input:focus, textarea:focus, select:focus{
       border-color: rgba(193,18,31,.55);
       box-shadow: 0 0 0 4px rgba(193,18,31,.10);
     }
 
-    .typeBadge{
-      display:inline-flex;
-      align-items:center;
-      gap:8px;
-      border-radius:999px;
-      padding:7px 10px;
-      border:1px solid rgba(193,18,31,.18);
-      background: rgba(193,18,31,.06);
-      font-size:12px;
-      font-weight:800;
-      color:var(--redDark);
-      white-space:nowrap;
-      height: fit-content;
-    }
-
-    /* ===== History Tabs ===== */
-    .tabs{ display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
-    .tab{
-      border:1px solid var(--line);
-      background:#fff;
-      padding:10px 12px;
-      border-radius:999px;
-      cursor:pointer;
-      font-weight:800;
-      font-size:13px;
-      color:var(--ink);
-      transition:.12s ease;
-      min-width:140px;
-      user-select:none;
-    }
-    .tab:hover{ border-color: rgba(193,18,31,.35); transform: translateY(-1px); }
-    .tab.active{
-      border-color: rgba(193,18,31,.55);
-      background: rgba(193,18,31,.06);
-      color: var(--redDark);
-      box-shadow: 0 10px 18px rgba(193,18,31,.08);
-    }
+    .muted{ color:var(--muted); font-weight:650; }
 
     /* ===== History list ===== */
     .list{ display:flex; flex-direction:column; gap:10px; }
@@ -399,7 +363,6 @@
     .status.pending{ color: var(--warn); border-color: rgba(181,71,8,.25); background: rgba(181,71,8,.06); }
     .status.approved{ color: var(--good); border-color: rgba(15,118,110,.25); background: rgba(15,118,110,.06); }
     .status.rejected{ color: var(--bad); border-color: rgba(180,35,24,.22); background: rgba(180,35,24,.06); }
-    .status.expired{ color:#374151; border-color: rgba(55,65,81,.25); background: rgba(55,65,81,.06); }
 
     /* ===== Toast ===== */
     .toast{
@@ -457,7 +420,30 @@
     .sb-approved{ color:var(--good); border-color: rgba(15,118,110,.25); background: rgba(15,118,110,.06); }
     .sb-rejected{ color:var(--bad); border-color: rgba(180,35,24,.22); background: rgba(180,35,24,.06); }
 
-    .muted{ color:var(--muted); font-weight:650; }
+    .arrivalBox{
+      border:1px dashed rgba(15,118,110,.25);
+      background: rgba(15,118,110,.04);
+      border-radius:14px;
+      padding:10px;
+      display:flex;
+      flex-direction:column;
+      gap:8px;
+    }
+    .arrivalRow{
+      display:flex;
+      gap:10px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+    .arrivalRow input{
+      max-width:200px;
+    }
+    .tiny{
+      font-size:11.5px;
+      color:var(--muted);
+      font-weight:650;
+      line-height:1.35;
+    }
   </style>
 </head>
 
@@ -523,7 +509,7 @@
     <section class="card hidden" id="secApply">
       <div class="cardHead">
         <h3 class="cardTitle">Apply Leave</h3>
-        <div class="typeBadge" id="typeBadge">Leave Type: —</div>
+        <div class="muted">Routing is automatic (based on OUT time).</div>
       </div>
 
       <div class="cardBody">
@@ -540,8 +526,20 @@
           </div>
 
           <div class="field">
-            <label for="reason">Reason</label>
-            <textarea id="reason" placeholder="Reason for leave" required></textarea>
+            <label for="reasonCategory">Reason Category</label>
+            <select id="reasonCategory" required>
+              <option value="" selected disabled>Select a reason</option>
+              <option value="personal">Personal</option>
+              <option value="academic">Academic (SIP/Placement/IV/Competition)</option>
+              <option value="emergency">Emergency (Medical/Family)</option>
+              <option value="vacation">Vacation</option>
+              <option value="other">Other</option>
+            </select>
+          </div>
+
+          <div class="field">
+            <label for="reasonText">Reason Details <span class="muted" id="reasonHint">(optional)</span></label>
+            <textarea id="reasonText" placeholder="Type details (mandatory only for Other)"></textarea>
           </div>
 
           <div class="row2">
@@ -569,12 +567,6 @@
       </div>
 
       <div class="cardBody">
-        <div class="tabs">
-          <button class="tab active" id="tabSingle" type="button">Single Day</button>
-          <button class="tab" id="tabOne" type="button">One Day</button>
-          <button class="tab" id="tabExtended" type="button">Extended</button>
-        </div>
-
         <div class="list" id="historyList"></div>
         <div id="toastHistory" class="toast"></div>
       </div>
@@ -585,8 +577,8 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
     import {
-      getFirestore, doc, getDoc, collection, addDoc,
-      query, where, limit, getDocs, serverTimestamp
+      getFirestore, doc, getDoc, collection, addDoc, updateDoc,
+      query, where, limit, getDocs, serverTimestamp, Timestamp
     } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
     // ✅ bfcache fix: after logout, back button shouldn't show old dashboard
@@ -602,6 +594,9 @@
       messagingSenderId: "802112635142",
       appId: "1:802112635142:web:0fd0f5ad1ae3ef8eb4de87"
     };
+
+    const DEAN_EMAIL = "deanacademicchennai@xime.org";
+    const GATE_OTP_ENDPOINT = "https://xime-gate-otp-engine.vercel.app/api/gateCode";
 
     const APPROVER_NAMES = {
       "bothichandar@xime.org": "Bothichandar",
@@ -653,17 +648,18 @@
 
     const outDT = document.getElementById("outDT");
     const inDT = document.getElementById("inDT");
-    const reason = document.getElementById("reason");
+
+    const reasonCategory = document.getElementById("reasonCategory");
+    const reasonText = document.getElementById("reasonText");
+    const reasonHint = document.getElementById("reasonHint");
+
     const roomNo = document.getElementById("roomNo");
     const phone = document.getElementById("phone");
-    const typeBadge = document.getElementById("typeBadge");
+
     const leaveForm = document.getElementById("leaveForm");
     const submitLeaveBtn = document.getElementById("submitLeaveBtn");
     const toastLeave = document.getElementById("toastLeave");
 
-    const tabSingle = document.getElementById("tabSingle");
-    const tabOne = document.getElementById("tabOne");
-    const tabExtended = document.getElementById("tabExtended");
     const historyList = document.getElementById("historyList");
     const toastHistory = document.getElementById("toastHistory");
 
@@ -673,6 +669,7 @@
       el.textContent = msg;
     }
     function clearToast(el){ el.className = "toast"; el.textContent = ""; }
+
     function normalizeRoll(v){ return String(v || "").trim().toUpperCase(); }
     function normalizeEmail(v){ return String(v || "").trim().toLowerCase(); }
 
@@ -699,35 +696,124 @@
       return `${dd}/${mm}/${yyyy}  ${hh}:${min} ${ampm}`;
     }
 
-    function detectLeaveType(outISO, inISO){
-      const out = new Date(outISO);
-      const inn = new Date(inISO);
-      if (isNaN(out) || isNaN(inn) || inn <= out) return null;
-      if (out.toDateString() === inn.toDateString()) return "single_day";
-      const outMid = new Date(out.getFullYear(), out.getMonth(), out.getDate());
-      const inMid  = new Date(inn.getFullYear(), inn.getMonth(), inn.getDate());
-      const diffDays = Math.round((inMid - outMid) / (1000*60*60*24));
-      if (diffDays === 1) return "one_day";
-      return "extended_leave";
+    function minutesToHM(mins){
+      const m = Math.max(0, Math.floor(Number(mins) || 0));
+      const h = Math.floor(m / 60);
+      const r = m % 60;
+      if (h <= 0) return `${r}m`;
+      if (r === 0) return `${h}h`;
+      return `${h}h ${r}m`;
     }
 
-    function typeLabel(t){
-      if (t === "single_day") return "Single Day";
-      if (t === "one_day") return "One Day";
-      if (t === "extended_leave") return "Extended";
-      return "—";
+    function displayNameForEmail(email){
+      const e = normalizeEmail(email);
+      return APPROVER_NAMES[e] || e || "—";
     }
 
-    function updateTypeBadge(){
-      const t = detectLeaveType(outDT.value, inDT.value);
-      typeBadge.textContent = "Leave Type: " + typeLabel(t);
+    function roleLabel(role){
+      const r = String(role || "").toLowerCase();
+      if (r === "batch_coordinator") return "Batch Coordinator";
+      if (r === "warden") return "Warden";
+      if (r === "dean") return "Dean";
+      return "Approver";
     }
-    outDT.addEventListener("change", updateTypeBadge);
-    inDT.addEventListener("change", updateTypeBadge);
 
-    phone.addEventListener("input", () => {
-      phone.value = phone.value.replace(/\D/g, "").slice(0, 10);
-    });
+    function statusBadgeClass(status){
+      const s = String(status || "").toLowerCase();
+      if (s.startsWith("pending")) return "pending";
+      if (s.startsWith("rejected")) return "rejected";
+      if (s.startsWith("approved")) return "approved";
+      return "pending";
+    }
+
+    function statusLabel(status){
+      const s = String(status || "").toLowerCase();
+      if (s === "pending_l1") return "PENDING (L1)";
+      if (s === "pending_dean") return "PENDING (DEAN)";
+      if (s === "rejected_l1") return "REJECTED (L1)";
+      if (s === "rejected_dean") return "REJECTED (DEAN)";
+      if (s === "approved_final") return "APPROVED";
+      if (s === "approved_dean_final") return "APPROVED";
+      return (status || "PENDING").toString().toUpperCase();
+    }
+
+    function computeOutDayGroup(outDate){
+      // OUT datetime rules:
+      // Fri -> weekend_block
+      // Sat -> weekend_block
+      // Sun -> weekend_block (for day), but we store group using day (Fri/Sat/Sun) intent
+      const dow = outDate.getDay(); // 0 Sun .. 6 Sat
+      if (dow === 5 || dow === 6 || dow === 0) return "weekend_block";
+      return "weekday";
+    }
+
+    function computeL1Role(outDate){
+      // 6:00 PM EXACT = BC
+      const dow = outDate.getDay(); // 0 Sun .. 6 Sat
+      const mins = outDate.getHours() * 60 + outDate.getMinutes();
+
+      // Friday/Saturday => BC always
+      if (dow === 5 || dow === 6) return "batch_coordinator";
+
+      // Sunday: until 6:00 PM inclusive => BC else Warden
+      if (dow === 0){
+        return (mins <= 18*60) ? "batch_coordinator" : "warden";
+      }
+
+      // Mon-Thu: 8:00 AM to 6:00 PM inclusive => BC else Warden
+      const dayStart = 8*60;
+      const dayEnd = 18*60; // inclusive
+      if (mins >= dayStart && mins <= dayEnd) return "batch_coordinator";
+      return "warden";
+    }
+
+    function computeOutWindow(outDate){
+      const mins = outDate.getHours() * 60 + outDate.getMinutes();
+      const dayStart = 8*60;
+      const dayEnd = 18*60; // inclusive
+      return (mins >= dayStart && mins <= dayEnd) ? "day" : "night";
+    }
+
+    async function findApproverEmailForBC(year){
+      const y = Number(year) || 0;
+      const q1 = query(
+        collection(db, "approvers"),
+        where("is_active", "==", true),
+        where("bc_years", "array-contains", y),
+        limit(5)
+      );
+      const snap = await getDocs(q1);
+      if (!snap.empty) return normalizeEmail(snap.docs[0].data().email || snap.docs[0].id);
+      return ""; // fallback later
+    }
+
+    async function findApproverEmailForWarden(hostel){
+      const h = String(hostel || "").trim().toLowerCase();
+      const q1 = query(
+        collection(db, "approvers"),
+        where("is_active", "==", true),
+        where("warden_hostels", "array-contains", h),
+        limit(5)
+      );
+      const snap = await getDocs(q1);
+      if (!snap.empty) return normalizeEmail(snap.docs[0].data().email || snap.docs[0].id);
+      return "";
+    }
+
+    // Hard fallback (only used if approvers collection doesn't match)
+    function fallbackBCEmailByYear(year){
+      const y = Number(year) || 0;
+      if (y === 2) return "bothichandar@xime.org";
+      if (y === 1) return "arulmary@xime.org";
+      return "arulmary@xime.org";
+    }
+    function fallbackWardenByHostel(hostel){
+      const h = String(hostel || "").toLowerCase();
+      if (h === "boys") return "bothichandar@xime.org";
+      if (h === "girls") return "snehaprabha@xime.org";
+      if (h === "guest_house") return "arulmary@xime.org";
+      return "";
+    }
 
     function setMainTab(which){
       [mainProfile, mainApply, mainHistory].forEach(x => x.classList.remove("active"));
@@ -739,10 +825,29 @@
 
     mainProfile.addEventListener("click", () => setMainTab("profile"));
     mainApply.addEventListener("click", () => setMainTab("apply"));
+    mainHistory.addEventListener("click", async () => {
+      setMainTab("history");
+      if (studentEmailLower){
+        await loadHistoryByEmail(studentEmailLower);
+      }
+    });
 
     logoutBtn.addEventListener("click", async () => {
       try{ await signOut(auth); }catch(_){}
       window.location.replace("../index.html"); // ✅ avoid back-cache showing dashboard
+    });
+
+    phone.addEventListener("input", () => {
+      phone.value = phone.value.replace(/\D/g, "").slice(0, 10);
+    });
+
+    reasonCategory.addEventListener("change", () => {
+      const v = String(reasonCategory.value || "");
+      if (v === "other"){
+        reasonHint.textContent = "(mandatory)";
+      }else{
+        reasonHint.textContent = "(optional)";
+      }
     });
 
     // ===== Photo handling =====
@@ -802,7 +907,7 @@
       photoHint.textContent = "Loading photo…";
       let usedFallback = false;
 
-      avatar.referrerPolicy = "no-referrer"; // ✅ helps on Google-hosted images
+      avatar.referrerPolicy = "no-referrer";
 
       avatar.onload = () => {
         avatar.style.display = "block";
@@ -842,122 +947,13 @@
       return snap.data();
     }
 
-    async function hasActiveSameTypeRequestByEmail(studentEmail, leaveTypeDB){
-      const q1 = query(
-        collection(db, "leave_requests"),
-        where("student_email", "==", studentEmail),
-        where("leave_type", "==", leaveTypeDB),
-        limit(120)
-      );
-
-      const snap = await getDocs(q1);
-      if (snap.empty) return false;
-
-      const now = new Date();
-      for (const d of snap.docs){
-        const data = d.data();
-        const st = String(data.status || "").toLowerCase();
-        if (st === "pending") return true;
-
-        if (st === "approved"){
-          const inISO = data.in_datetime || data.inDT || "";
-          const inDate = new Date(inISO);
-          if (inISO && !isNaN(inDate) && now <= inDate) return true;
-        }
-      }
-      return false;
-    }
-
-    async function getApprovedCountThisMonthByEmail(studentEmail, leaveTypeDB, monthKey){
-      const q1 = query(
-        collection(db, "leave_requests"),
-        where("student_email", "==", studentEmail),
-        limit(250)
-      );
-      const snap = await getDocs(q1);
-
-      let count = 0;
-      snap.forEach(docu => {
-        const r = docu.data() || {};
-        if (String(r.leave_type || "") !== String(leaveTypeDB || "")) return;
-        if (String(r.status || "").toLowerCase() !== "approved") return;
-        if (String(r.month_key || "") !== String(monthKey || "")) return;
-        count++;
-      });
-      return count;
-    }
-
-    // ===== History =====
-    let activeHistoryType = "single_day";
-    let historyLoadedOnce = false;
-
-    function setActiveHistoryTab(which){
-      tabSingle.classList.remove("active");
-      tabOne.classList.remove("active");
-      tabExtended.classList.remove("active");
-      if (which === "single_day") tabSingle.classList.add("active");
-      if (which === "one_day") tabOne.classList.add("active");
-      if (which === "extended_leave") tabExtended.classList.add("active");
-    }
-
-    function normLeaveType(raw){
-      const t = String(raw || "").trim().toLowerCase();
-      if (t === "single") return "single_day";
-      if (t === "one") return "one_day";
-      if (t === "extended") return "extended_leave";
-      return "";
-    }
-
-    function matchHistoryTypeFilter(docLeaveType, selectedTab){
-      return normLeaveType(docLeaveType) === selectedTab;
-    }
-
-    function getOutValue(r){ return r.out_datetime || r.outDT || r.out_datetime_str || ""; }
-    function getInValue(r){ return r.in_datetime || r.inDT || r.in_datetime_str || ""; }
-
     function getCreatedMillis(r){
-      const c = r.created_at || r.createdAt || r.created_on || r.updated_at || r.updatedAt;
+      const c = r.created_at || r.createdAt || r.updated_at || r.updatedAt;
       if (!c) return 0;
       if (typeof c.toMillis === "function") return c.toMillis();
       if (typeof c.toDate === "function") return c.toDate().getTime();
       const d = new Date(c);
       return isNaN(d) ? 0 : d.getTime();
-    }
-
-    function computeDisplayStatus(row){
-      const base = String(row.status || "pending").toLowerCase();
-      if (base !== "approved") return base;
-      const inVal = getInValue(row);
-      const inDate = new Date(String(inVal || ""));
-      if (!inVal || isNaN(inDate)) return "approved";
-      return (new Date() > inDate) ? "expired" : "approved";
-    }
-
-    function stageBadgeClass(st){
-      const s = String(st || "").toLowerCase();
-      if (s === "approved") return "stageBadge sb-approved";
-      if (s === "rejected") return "stageBadge sb-rejected";
-      return "stageBadge sb-pending";
-    }
-
-    function stageStatusText(st){
-      const s = String(st || "").toLowerCase();
-      if (s === "approved") return "APPROVED";
-      if (s === "rejected") return "REJECTED";
-      return "PENDING";
-    }
-
-    function roleLabelFromContext(arr){
-      const a = Array.isArray(arr) ? arr : [];
-      if (a.includes("batch_coordinator")) return "Batch Coordinator";
-      if (a.includes("warden")) return "Warden";
-      if (a.includes("dean")) return "Dean";
-      return "Approver";
-    }
-
-    function displayNameForEmail(email){
-      const e = normalizeEmail(email);
-      return APPROVER_NAMES[e] || e || "—";
     }
 
     function renderStages(chain){
@@ -966,18 +962,35 @@
 
       const rows = arr.map(x => {
         const email = normalizeEmail(x.email || "");
-        const role = roleLabelFromContext(x.role_context || x.roleContext || []);
-        const st = (x.status || x.action || "pending");
-        const acted = x.actedAt || x.acted_at || "";
+        const role = roleLabel(x.role || "");
+        const act = String(x.action || "pending").toLowerCase();
+        const actedAt = x.acted_at || x.actedAt || null;
         const remark = x.remark || "";
-        const meta = [role, email, acted ? `• ${acted}` : "", remark ? `• ${remark}` : ""].filter(Boolean).join(" ");
+
+        const badgeClass =
+          act === "approved" ? "stageBadge sb-approved" :
+          act === "rejected" ? "stageBadge sb-rejected" :
+          "stageBadge sb-pending";
+
+        const badgeText =
+          act === "approved" ? "APPROVED" :
+          act === "rejected" ? "REJECTED" :
+          "PENDING";
+
+        const metaParts = [
+          role,
+          email ? `• ${email}` : "",
+          actedAt ? `• ${fmtDT(actedAt)}` : "",
+          remark ? `• ${remark}` : ""
+        ].filter(Boolean);
+
         return `
           <div class="stageRow">
             <div class="stageLeft">
               <div class="stageName">${displayNameForEmail(email)}</div>
-              <div class="stageMeta">${meta}</div>
+              <div class="stageMeta">${metaParts.join(" ")}</div>
             </div>
-            <div class="${stageBadgeClass(st)}">${stageStatusText(st)}</div>
+            <div class="${badgeClass}">${badgeText}</div>
           </div>
         `;
       }).join("");
@@ -990,7 +1003,86 @@
       `;
     }
 
-    async function loadHistoryByEmail(studentEmail, selectedTabType){
+    function isApprovedStatus(status){
+      const s = String(status || "").toLowerCase();
+      return s === "approved_final" || s === "approved_dean_final";
+    }
+
+    async function verifyArrival(requestId, row, codeInputEl, toastEl){
+      clearToast(toastEl);
+
+      try{
+        const outTs = row.out_datetime;
+        const inTs = row.in_datetime;
+        const outDate = toJSDate(outTs);
+        const inDate = toJSDate(inTs);
+        const now = new Date();
+
+        if (!outDate){
+          showToast(toastEl, "Out time missing. Contact admin.", "bad");
+          return;
+        }
+
+        // Rule: allow verify only after OUT time is crossed
+        if (now < outDate){
+          await updateDoc(doc(db, "leave_requests", requestId), {
+            "arrival.code_last_status": "too_early",
+            "arrival.attempted_at": serverTimestamp(),
+            updated_at: serverTimestamp()
+          });
+          showToast(toastEl, "Not yet out — you can verify only after OUT time.", "bad");
+          return;
+        }
+
+        const entered = String(codeInputEl.value || "").trim();
+        if (!entered){
+          showToast(toastEl, "Enter the gate code.", "bad");
+          return;
+        }
+
+        // Fetch current OTP code
+        const resp = await fetch(GATE_OTP_ENDPOINT, { cache: "no-store" });
+        if (!resp.ok) throw new Error("Gate code server not reachable. Try again.");
+        const data = await resp.json();
+        const serverCode = String(data?.code || "").trim();
+
+        if (!serverCode || entered !== serverCode){
+          await updateDoc(doc(db, "leave_requests", requestId), {
+            "arrival.code_last_status": "invalid_code",
+            "arrival.attempted_at": serverTimestamp(),
+            updated_at: serverTimestamp()
+          });
+          showToast(toastEl, "Invalid code.", "bad");
+          return;
+        }
+
+        // Success => set actual in-time and compute late minutes vs in_datetime
+        const actual = now;
+        let lateMinutes = 0;
+        if (inDate && actual > inDate){
+          lateMinutes = Math.floor((actual.getTime() - inDate.getTime()) / (60*1000));
+        }
+
+        await updateDoc(doc(db, "leave_requests", requestId), {
+          "arrival.verified": true,
+          "arrival.code_last_status": "verified",
+          "arrival.attempted_at": serverTimestamp(),
+          "arrival.verified_at": serverTimestamp(),
+          "arrival.actual_in_time": serverTimestamp(),
+          "arrival.late_minutes": lateMinutes,
+          updated_at: serverTimestamp()
+        });
+
+        showToast(toastEl, "Arrival verified successfully.", "good");
+        await loadHistoryByEmail(studentEmailLower); // refresh UI
+
+      }catch(err){
+        console.error("verifyArrival error:", err);
+        showToast(toastEl, err?.message || "Failed to verify arrival.", "bad");
+      }
+    }
+
+    async function loadHistoryByEmail(studentEmail){
       clearToast(toastHistory);
       historyList.innerHTML = "";
       historyMeta.textContent = "Loading…";
@@ -1004,7 +1096,6 @@
 
         const snap = await getDocs(qMine);
         let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        rows = rows.filter(r => matchHistoryTypeFilter(r.leave_type, selectedTabType));
         rows.sort((a,b) => getCreatedMillis(b) - getCreatedMillis(a));
 
         if (!rows.length){
@@ -1022,39 +1113,88 @@
         const frag = document.createDocumentFragment();
 
         for (const r of rows){
-          const displayStatus = computeDisplayStatus(r);
-          const badge =
-            displayStatus === "approved" ? "approved" :
-            displayStatus === "rejected" ? "rejected" :
-            displayStatus === "expired" ? "expired" : "pending";
+          const status = String(r.status || "pending_l1");
+          const badge = statusBadgeClass(status);
 
-          const outVal = getOutValue(r);
-          const inVal = getInValue(r);
-          const showGateBtn = (displayStatus === "approved") && !!r.id;
+          const outVal = r.out_datetime;
+          const inVal = r.in_datetime;
+
+          const holderRole = r.current?.holder_role || "";
+          const holderEmail = r.current?.holder_email || r.routing?.l1_email || "";
+          const holderText = holderRole ? `${roleLabel(holderRole)} (${displayNameForEmail(holderEmail)})` : (holderEmail ? displayNameForEmail(holderEmail) : "—");
+
+          const approved = isApprovedStatus(status);
+
+          const arrival = r.arrival || {};
+          const arrivalVerified = !!arrival.verified;
+          const lateMins = arrival.late_minutes;
+          const verifiedAt = arrival.verified_at || arrival.actual_in_time;
 
           const el = document.createElement("div");
           el.className = "item";
+
+          // Gatepass button should still work for approved requests
+          const showGateBtn = approved && !!r.id;
+
+          // Arrival verify UI
+          let arrivalHTML = "";
+          if (approved){
+            if (arrivalVerified){
+              const msgLate = (Number(lateMins) > 0)
+                ? `Late by ${minutesToHM(lateMins)}`
+                : `On time`;
+              arrivalHTML = `
+                <div class="arrivalBox">
+                  <div class="t">Arrival: ✅ Verified</div>
+                  <div class="m">Verified at: ${fmtDT(verifiedAt)} • ${msgLate}</div>
+                </div>
+              `;
+            }else{
+              arrivalHTML = `
+                <div class="arrivalBox">
+                  <div class="t">Arrival Verification</div>
+                  <div class="tiny">Enter the gate code after your OUT time is crossed. This will record your actual in-time.</div>
+                  <div class="arrivalRow">
+                    <input type="text" inputmode="numeric" placeholder="Enter gate code" maxlength="12" class="gateCodeInput" />
+                    <button class="btn secondary verifyBtn" type="button">Verify</button>
+                  </div>
+                  <div class="toast" style="margin-top:6px;"></div>
+                </div>
+              `;
+            }
+          }
+
           el.innerHTML = `
             <div class="itemTop">
               <div class="left">
                 <div class="t">Out: ${fmtDT(outVal)}</div>
                 <div class="t">In: ${fmtDT(inVal)}</div>
-                <div class="m">Reason: ${r.reason || "-"}</div>
+                <div class="m">Reason: ${String(r.reason_category || "").toUpperCase()}${r.reason_text ? ` • ${r.reason_text}` : ""}</div>
+                <div class="m">Current: ${holderText}</div>
               </div>
 
               <div class="rightCol">
-                <div class="status ${badge}">${displayStatus.toUpperCase()}</div>
-                ${ showGateBtn ? `<button class="btn secondary" type="button" data-gpid="${r.id}">Gatepass</button>` : `` }
+                <div class="status ${badge}">${statusLabel(status)}</div>
+                ${ showGateBtn ? `<button class="btn secondary gateBtn" type="button" data-gpid="${r.id}">Gatepass</button>` : `` }
               </div>
             </div>
+
+            ${arrivalHTML}
             ${renderStages(r.approver_chain)}
           `;
 
-          const btn = el.querySelector('button[data-gpid]');
-          if (btn){
-            btn.addEventListener("click", () => {
-              window.location.href = `./gatepass.html?id=${encodeURIComponent(btn.dataset.gpid)}`;
+          const gateBtn = el.querySelector(".gateBtn");
+          if (gateBtn){
+            gateBtn.addEventListener("click", () => {
+              window.location.href = `./gatepass.html?id=${encodeURIComponent(gateBtn.dataset.gpid)}`;
             });
+          }
+
+          const verifyBtn = el.querySelector(".verifyBtn");
+          if (verifyBtn){
+            const codeInputEl = el.querySelector(".gateCodeInput");
+            const toastEl = el.querySelector(".arrivalBox .toast");
+            verifyBtn.addEventListener("click", () => verifyArrival(r.id, r, codeInputEl, toastEl));
           }
 
           frag.appendChild(el);
@@ -1070,81 +1210,7 @@
       }
     }
 
-    tabSingle.addEventListener("click", async () => {
-      activeHistoryType = "single_day";
-      setActiveHistoryTab(activeHistoryType);
-      if (studentEmailLower) await loadHistoryByEmail(studentEmailLower, activeHistoryType);
-    });
-
-    tabOne.addEventListener("click", async () => {
-      activeHistoryType = "one_day";
-      setActiveHistoryTab(activeHistoryType);
-      if (studentEmailLower) await loadHistoryByEmail(studentEmailLower, activeHistoryType);
-    });
-
-    tabExtended.addEventListener("click", async () => {
-      activeHistoryType = "extended_leave";
-      setActiveHistoryTab(activeHistoryType);
-      if (studentEmailLower) await loadHistoryByEmail(studentEmailLower, activeHistoryType);
-    });
-
-    mainHistory.addEventListener("click", async () => {
-      setMainTab("history");
-      setActiveHistoryTab(activeHistoryType);
-      if (studentEmailLower){
-        historyLoadedOnce = true;
-        await loadHistoryByEmail(studentEmailLower, activeHistoryType);
-      }
-    });
-
-    // ===== Approver chain helpers =====
-    function nextHolderEmail(chain){
-      const arr = Array.isArray(chain) ? chain : [];
-      const p = arr.find(x => String(x.action || x.status || "").toLowerCase() === "pending");
-      return p ? normalizeEmail(p.email) : null;
-    }
-
-    function getBatchCoordinatorEmailByYear(year){
-      const y = Number(year) || 0;
-      if (y === 2) return "bothichandar@xime.org";
-      if (y === 1) return "arulmary@xime.org";
-      return "arulmary@xime.org";
-    }
-
-    function getWardenEmailByHostel(hostel){
-      const h = String(hostel || "").toLowerCase();
-      if (h.includes("boy")) return "bothichandar@xime.org";
-      if (h.includes("girl")) return "snehaprabha@xime.org";
-      if (h.includes("guest")) return "arulmary@xime.org";
-      if (h === "boys") return "bothichandar@xime.org";
-      if (h === "girls") return "snehaprabha@xime.org";
-      if (h === "guest_house") return "arulmary@xime.org";
-      return "";
-    }
-
-    async function buildApproverChain(studentYear, hostel, leaveTypeDB){
-      const chain = [];
-      const bcEmail = getBatchCoordinatorEmailByYear(studentYear);
-
-      chain.push({ stage: 1, role_context:["batch_coordinator"], email: bcEmail, action:"pending", acted_at:"", remark:"" });
-
-      if (leaveTypeDB === "single"){
-        return chain;
-      }
-
-      const wardenEmail = getWardenEmailByHostel(hostel);
-      if (wardenEmail && normalizeEmail(wardenEmail) !== normalizeEmail(bcEmail)){
-        chain.push({ stage: 2, role_context:["warden"], email: wardenEmail, action:"pending", acted_at:"", remark:"" });
-      }
-
-      if (leaveTypeDB === "extended"){
-        chain.push({ stage: chain.length + 1, role_context:["dean"], email:"deanacademicchennai@xime.org", action:"pending", acted_at:"", remark:"" });
-      }
-
-      return chain;
-    }
-
-    // ===== Submit leave =====
+    // ===== Submit leave (NEW SCHEMA) =====
     leaveForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       clearToast(toastLeave);
@@ -1156,23 +1222,31 @@
 
       const outISO = outDT.value;
       const inISO  = inDT.value;
+      const outDate = new Date(outISO);
+      const inDate = new Date(inISO);
 
-      const leaveTypeUI = detectLeaveType(outISO, inISO);
-      if (!leaveTypeUI){
+      if (isNaN(outDate) || isNaN(inDate) || inDate <= outDate){
         showToast(toastLeave, "Invalid Out / In date and time.", "bad");
         return;
       }
 
-      const leaveTypeDB =
-        leaveTypeUI === "single_day" ? "single" :
-        leaveTypeUI === "one_day" ? "one" : "extended";
+      const cat = String(reasonCategory.value || "").trim();
+      if (!cat){
+        showToast(toastLeave, "Please select a reason category.", "bad");
+        return;
+      }
 
-      const reasonVal = reason.value.trim();
+      const reasonVal = String(reasonText.value || "").trim();
+      if (cat === "other" && !reasonVal){
+        showToast(toastLeave, "Reason details are mandatory for Other.", "bad");
+        return;
+      }
+
       const roomVal   = roomNo.value.trim();
       const phoneVal  = phone.value.trim();
 
-      if (!reasonVal || !roomVal || !phoneVal){
-        showToast(toastLeave, "Please fill all fields.", "bad");
+      if (!roomVal || !phoneVal){
+        showToast(toastLeave, "Please fill all required fields.", "bad");
         return;
       }
       if (!/^\d{10}$/.test(phoneVal)){
@@ -1183,27 +1257,30 @@
       submitLeaveBtn.disabled = true;
 
       try{
-        const blocked = await hasActiveSameTypeRequestByEmail(studentEmailLower, leaveTypeDB);
-        if (blocked){
-          showToast(toastLeave, "Active request of the same type already exists.", "bad");
-          return;
+        const year  = student.year ?? student.year_no ?? student.yearNo ?? "";
+        const hostel  = String(student.hostel ?? "").toLowerCase();
+
+        // Compute routing
+        const out_day_group = computeOutDayGroup(outDate);
+        const out_window = computeOutWindow(outDate);
+        const l1_role = computeL1Role(outDate);
+
+        // Resolve emails from approvers collection (fallback to hardcoded if missing)
+        let l1_email = "";
+        if (l1_role === "batch_coordinator"){
+          l1_email = await findApproverEmailForBC(year);
+          if (!l1_email) l1_email = fallbackBCEmailByYear(year);
+        }else{
+          l1_email = await findApproverEmailForWarden(hostel);
+          if (!l1_email) l1_email = fallbackWardenByHostel(hostel);
         }
 
-        const year  = student.year ?? student.year_no ?? student.yearNo ?? "";
-        const hostel  = student.hostel ?? "";
-        const chain = await buildApproverChain(year, hostel, leaveTypeDB);
-
-        const nextHolder = nextHolderEmail(chain);
-        if (!nextHolder) throw new Error("Approver chain misconfigured.");
-
-        const monthKey = outISO.slice(0,7);
-        const approvedBefore = await getApprovedCountThisMonthByEmail(studentEmailLower, leaveTypeDB, monthKey);
-        const grantIndex = approvedBefore + 1;
-
-        const deanIntimationRequired = (leaveTypeDB === "one");
+        l1_email = normalizeEmail(l1_email);
+        if (!l1_email) throw new Error("Approver mapping missing (L1). Check approvers collection.");
 
         const payload = {
-          student_uid: currentUser?.uid || "", // ✅ IMPORTANT for gatepass checks
+          // student snapshot
+          student_uid: currentUser?.uid || "",
           student_rollno: studentRoll,
           student_name: student.name || "",
           student_email: studentEmailLower,
@@ -1211,26 +1288,60 @@
           student_hostel: hostel,
           student_room_no: roomVal,
           student_photo_url: student.student_photo_url || student.photo_url || "",
-          approved_before_in_month: approvedBefore,
-          grant_index_in_month: grantIndex,
-          month_key: monthKey,
 
-          leave_type: leaveTypeDB,
-          reason: reasonVal,
-          out_datetime: outISO,
-          in_datetime: inISO,
+          // form fields
+          reason_category: cat,
+          reason_text: reasonVal,
+          out_datetime: Timestamp.fromDate(outDate),
+          in_datetime: Timestamp.fromDate(inDate),
           contact_no: phoneVal,
 
-          approver_chain: chain,
-          approver_emails: chain.map(x => normalizeEmail(x.email)),
-          current_holder_email: nextHolder,
+          // routing snapshot
+          routing: {
+            out_day_group,
+            out_window,
+            l1_role,
+            l1_email,
+            dean_email: DEAN_EMAIL,
+            policy_version: 2
+          },
 
-          dean_intimation_required: deanIntimationRequired,
-          dean_intimated: false,
-          dean_intimated_at: "",
-          dean_intimated_by: "",
+          // workflow
+          status: "pending_l1",
+          current: {
+            stage: "L1",
+            holder_role: l1_role,
+            holder_email: l1_email
+          },
 
-          status: "pending",
+          escalation: {
+            requested: false,
+            requested_by: "",
+            requested_at: null,
+            reason: "",
+            dean_action: "not_required"
+          },
+
+          approver_chain: [
+            {
+              stage: 1,
+              role: l1_role,
+              email: l1_email,
+              action: "pending",
+              acted_at: null,
+              remark: ""
+            }
+          ],
+
+          arrival: {
+            verified: false,
+            attempted_at: null,
+            verified_at: null,
+            actual_in_time: null,
+            code_last_status: "",
+            late_minutes: null
+          },
+
           created_at: serverTimestamp(),
           updated_at: serverTimestamp()
         };
@@ -1239,11 +1350,7 @@
 
         showToast(toastLeave, "Leave request submitted successfully.", "good");
         leaveForm.reset();
-        updateTypeBadge();
-
-        if (historyLoadedOnce && studentEmailLower){
-          await loadHistoryByEmail(studentEmailLower, activeHistoryType);
-        }
+        reasonHint.textContent = "(optional)";
 
       }catch(err){
         console.error(err);
@@ -1286,8 +1393,6 @@
         historyMeta.textContent = "Open History to load requests";
 
         setMainTab("profile");
-        setActiveHistoryTab(activeHistoryType);
-        updateTypeBadge();
 
       }catch(err){
         setMainTab("profile");
