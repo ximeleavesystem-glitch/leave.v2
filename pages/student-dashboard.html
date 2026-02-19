@@ -1288,6 +1288,10 @@
         showToast(toastLeave, "Contact number must be exactly 10 digits.", "bad");
         return;
       }
+if (!currentUser?.uid){
+  showToast(toastLeave, "Auth not ready. Please refresh and try again.", "bad");
+  return;
+}
 
       submitLeaveBtn.disabled = true;
 
@@ -1453,6 +1457,7 @@ if (!currentUser?.uid){
   </script>
 </body>
 </html>
+
 
 
 
