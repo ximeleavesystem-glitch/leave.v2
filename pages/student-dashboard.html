@@ -1208,6 +1208,8 @@
     }
     async function hasActiveRequestInSameGroup(studentEmail, outDayGroup){
   // Active = pending OR approved but arrival not verified yet
+  // This blocks multiple "weekday" requests & multiple "weekend_block" requests.
+
   const q1 = query(
     collection(db, "leave_requests"),
     where("student_email", "==", studentEmail),
@@ -1222,14 +1224,20 @@
     const r = d.data() || {};
     const st = String(r.status || "").toLowerCase();
 
-    const isPending = (st === "pending_l1" || st === "pending_dean");
-    const isApproved = (st === "approved_final" || st === "approved_dean_final");
+    // ✅ treat all pending variants as active (future-proof)
+    const isPending = st.startsWith("pending");
+
+    // ✅ treat all approved variants as approved
+    const isApproved = st.startsWith("approved");
+
+    // rejected/cancelled -> not active
+    if (!isPending && !isApproved) continue;
 
     if (isPending) return true;
 
     if (isApproved){
       const verified = !!(r.arrival && r.arrival.verified);
-      if (!verified) return true;  // block until arrival verified
+      if (!verified) return true; // block until arrival verified
     }
   }
 
@@ -1298,8 +1306,9 @@ if (hasActiveSameGroup){
     ? "You already have an active WEEKEND request. Submit a new weekend request only after your return is verified."
     : "You already have an active WEEKDAY request. Submit a new weekday request only after your return is verified.";
   showToast(toastLeave, msg, "bad");
-  return;
+  return; // ✅ finally will still run and re-enable button
 }
+
 
         // Resolve emails from approvers collection (fallback to hardcoded if missing)
         let l1_email = "";
@@ -1438,4 +1447,5 @@ if (hasActiveSameGroup){
   </script>
 </body>
 </html>
+
 
