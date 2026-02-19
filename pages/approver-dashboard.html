@@ -150,7 +150,7 @@ body{
 /* Filters / Dashboard */
 .filterBar{
   display:grid;
-  grid-template-columns: 1.2fr 1fr 1fr 140px;
+  grid-template-columns: 1fr 1fr 140px;
   gap:10px;
   margin-bottom:12px;
 }
@@ -211,7 +211,7 @@ select:focus, input:focus{
 .metric .k{ font-size:11px; color:var(--muted); font-weight:950; letter-spacing:.2px; }
 .metric .v{ margin-top:6px; font-size:24px; font-weight:1100; }
 
-/* ===== Reports Panel ===== */
+/* Reports */
 .reportsGrid{
   margin-top:14px;
   display:grid;
@@ -256,50 +256,7 @@ select:focus, input:focus{
 }
 @media(max-width: 1100px){ .reportRow{ grid-template-columns: 1fr 1fr; } }
 
-.chipWrap{
-  border:1px solid var(--line);
-  border-radius:16px;
-  background:var(--soft);
-  padding:10px 12px;
-}
-.chipWrap .lbl{
-  display:block;
-  font-size:11px;
-  color:var(--muted);
-  font-weight:900;
-  letter-spacing:.2px;
-  margin-bottom:8px;
-}
-.chips{
-  display:flex;
-  gap:8px;
-  flex-wrap:wrap;
-}
-.chip{
-  user-select:none;
-  display:inline-flex;
-  align-items:center;
-  gap:8px;
-  padding:8px 10px;
-  border-radius:999px;
-  border:1px solid var(--line);
-  background:#fff;
-  font-weight:950;
-  font-size:12.5px;
-  cursor:pointer;
-  transition:.12s ease;
-}
-.chip:hover{ transform: translateY(-1px); border-color: rgba(193,18,31,.35); }
-.chip input{ width:auto; }
-.chip.on{
-  background: rgba(193,18,31,.08);
-  border-color: rgba(193,18,31,.55);
-  color: var(--redDark);
-}
-
-.smallBtns{
-  display:flex; gap:10px; flex-wrap:wrap; align-items:center;
-}
+.smallBtns{ display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 .btnGhost{
   border:1px solid var(--line);
   background:#fff;
@@ -328,30 +285,7 @@ select:focus, input:focus{
 .toast.good{ border-color: rgba(15,118,110,.25); background: rgba(15,118,110,.06); color:#0f3d39; }
 .toast.bad{ border-color: rgba(180,35,24,.22); background: rgba(180,35,24,.06); color:#5a1110; }
 
-/* Leave tabs */
-.leaveTabs{ display:flex; gap:12px; margin-bottom:12px; flex-wrap:wrap; }
-.leaveTab{
-  flex:1;
-  padding:12px;
-  border-radius:16px;
-  border:1px solid var(--line);
-  background:#fff;
-  font-weight:950;
-  cursor:pointer;
-  text-align:center;
-  transition:.15s ease;
-  box-shadow: 0 10px 22px rgba(2,6,23,.06);
-  min-width: 160px;
-}
-.leaveTab:hover{ transform: translateY(-1px); border-color: rgba(193,18,31,.35); }
-.leaveTab.active{
-  background:rgba(193,18,31,.08);
-  border-color:rgba(193,18,31,.5);
-  color:var(--redDark);
-  box-shadow: 0 14px 28px rgba(193,18,31,.10);
-}
-
-/* Status tabs */
+/* History Tabs */
 .statusTabs{ display:flex; gap:10px; margin-bottom:12px; flex-wrap:wrap; }
 .statusTab{
   padding:9px 12px;
@@ -474,8 +408,7 @@ textarea:focus{
   box-shadow: 0 0 0 4px rgba(193,18,31,.12);
 }
 
-/* Action buttons - more professional */
-.actions{ margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; }
+.actions{ margin-top:12px; display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
 .actionBtn{
   border:none;
   padding:11px 18px;
@@ -493,6 +426,17 @@ textarea:focus{
 
 .approveBtn{ background: linear-gradient(135deg, var(--good), #14b8a6); }
 .rejectBtn{ background: linear-gradient(135deg, var(--bad), #ff3b3b); }
+
+.inlineOpt{
+  display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  padding:10px 12px; border-radius:16px; border:1px dashed rgba(193,18,31,.3);
+  background: rgba(193,18,31,.04);
+  margin-top:10px;
+  font-weight:900;
+  color: var(--redDark);
+}
+.inlineOpt input{ width:auto; }
+.smallNote{ font-size:12px; color:var(--muted); font-weight:850; margin-top:8px; line-height:1.4; }
 </style>
 </head>
 
@@ -514,8 +458,10 @@ textarea:focus{
   <div class="mainTabs">
     <div class="mainTab active" id="tabDashboard" type="button">Dashboard</div>
     <div class="mainTab" id="tabRequests" type="button">Requests</div>
+    <div class="mainTab" id="tabHistory" type="button">History</div>
   </div>
 
+  <!-- DASHBOARD -->
   <section id="pageDashboard">
     <div class="headerGrid">
 
@@ -530,6 +476,7 @@ textarea:focus{
             <div class="metaLine" id="lineEmail"><b>Email</b> — <span id="apEmail">—</span></div>
             <div class="metaLine" id="lineWarden" style="display:none;"><b>Warden</b> — <span id="apWarden">—</span></div>
             <div class="metaLine" id="lineBC" style="display:none;"><b>Batch Coordinator</b> — <span id="apBC">—</span></div>
+            <div class="metaLine" id="lineDean" style="display:none;"><b>Dean</b> — <span id="apDean">Active</span></div>
           </div>
         </div>
       </section>
@@ -541,37 +488,28 @@ textarea:focus{
         <div class="panelBody">
           <div class="filterBar">
             <div class="filterBox">
-              <label>Leave Type</label>
-              <select id="fType">
-                <option value="all">All</option>
-                <option value="single">Single Day</option>
-                <option value="one">One Day</option>
-                <option value="extended">Extended Leave</option>
-              </select>
-            </div>
-            <div class="filterBox">
-              <label>From Date</label>
+              <label>From Date (Out)</label>
               <input id="fFrom" type="date">
             </div>
             <div class="filterBox">
-              <label>To Date</label>
+              <label>To Date (Out)</label>
               <input id="fTo" type="date">
             </div>
             <button class="applyBtn" type="button" id="applyFilters">Apply</button>
           </div>
 
           <div class="metrics">
-            <div class="metric"><div class="k">TOTAL REQUESTS</div><div class="v" id="mTotal">0</div></div>
-            <div class="metric"><div class="k">PENDING</div><div class="v" id="mPending">0</div></div>
-            <div class="metric"><div class="k">APPROVED</div><div class="v" id="mApproved">0</div></div>
-            <div class="metric"><div class="k">REJECTED</div><div class="v" id="mRejected">0</div></div>
+            <div class="metric"><div class="k">TOTAL (IN SCOPE)</div><div class="v" id="mTotal">0</div></div>
+            <div class="metric"><div class="k">PENDING FOR ME</div><div class="v" id="mPending">0</div></div>
+            <div class="metric"><div class="k">APPROVED BY ME</div><div class="v" id="mApproved">0</div></div>
+            <div class="metric"><div class="k">REJECTED BY ME</div><div class="v" id="mRejected">0</div></div>
           </div>
         </div>
       </section>
 
     </div>
 
-    <!-- ✅ Reports Panel (on opening page) -->
+    <!-- REPORTS -->
     <div class="reportsGrid">
       <section class="panel">
         <div class="panelHead">
@@ -582,12 +520,12 @@ textarea:focus{
         </div>
         <div class="panelBody">
           <div class="reportIntro">
-            Download a clean PDF of <b>Approved</b> requests (includes those that are now <b>Expired</b> based on IN time).
-            Reports are filtered by <b>IN datetime</b>.
+            Download PDF for <b>Final Approved</b> requests that were <b>approved by you</b> at your stage.
+            Includes <b>Actual In Time</b> + <b>Late By</b> and also a <b>Late Comers</b> list.
           </div>
 
           <div class="pills">
-            <button class="pill active" id="repModeTime" type="button">Timeframe (All Approved by Me)</button>
+            <button class="pill active" id="repModeTime" type="button">Timeframe (All Final Approved by Me)</button>
             <button class="pill" id="repModeStudent" type="button">Student-wise (Roll No + Timeframe)</button>
           </div>
 
@@ -619,15 +557,6 @@ textarea:focus{
             <button class="applyBtn" id="repDownload" type="button">Download PDF</button>
           </div>
 
-          <div class="chipWrap" style="margin-top:10px;">
-            <span class="lbl">Leave Type (Multiple)</span>
-            <div class="chips" id="repTypes">
-              <label class="chip on" data-type="single"><input type="checkbox" checked> Single Day</label>
-              <label class="chip on" data-type="one"><input type="checkbox" checked> One Day</label>
-              <label class="chip on" data-type="extended"><input type="checkbox" checked> Extended Leave</label>
-            </div>
-          </div>
-
           <div class="pills" style="margin-top:10px;">
             <button class="pill" id="repPreset7" type="button">Last 7 Days</button>
             <button class="pill" id="repPreset30" type="button">Last 30 Days</button>
@@ -638,9 +567,9 @@ textarea:focus{
         </div>
       </section>
     </div>
-
   </section>
 
+  <!-- REQUESTS (PENDING ONLY) -->
   <section id="pageRequests" class="hidden">
     <div id="reqFilterWrap" class="filterBar" style="grid-template-columns: 1fr 1fr 140px; margin-bottom:12px;">
       <div class="filterBox">
@@ -654,19 +583,23 @@ textarea:focus{
       <button class="applyBtn" type="button" id="applyReqFilters">Apply</button>
     </div>
 
-    <div class="leaveTabs">
-      <div class="leaveTab active" id="tSingle">Single Day</div>
-      <div class="leaveTab" id="tOne">One Day</div>
-      <div class="leaveTab" id="tExtended">Extended Leave</div>
-    </div>
-
-    <div class="statusTabs">
-      <div class="statusTab active" id="sPending">Pending <span class="count" id="cPending">0</span></div>
-      <div class="statusTab" id="sApproved">Approved <span class="count" id="cApproved">0</span></div>
-      <div class="statusTab" id="sRejected">Rejected <span class="count" id="cRejected">0</span></div>
+    <div class="smallNote">
+      ✅ This page shows only <b>pending requests assigned to you</b> (L1 or Dean).  
+      Escalation to Dean can be selected while approving.
     </div>
 
     <div id="requestsContainer"></div>
+  </section>
+
+  <!-- HISTORY -->
+  <section id="pageHistory" class="hidden">
+    <div class="statusTabs">
+      <div class="statusTab active" id="hApproved">Approved <span class="count" id="hcApproved">0</span></div>
+      <div class="statusTab" id="hRejected">Rejected <span class="count" id="hcRejected">0</span></div>
+      <div class="statusTab" id="hEscalated">Escalated to Dean <span class="count" id="hcEscalated">0</span></div>
+    </div>
+
+    <div id="historyContainer"></div>
   </section>
 
 </div>
@@ -683,7 +616,6 @@ textarea:focus{
     serverTimestamp, setDoc
   } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-  // ✅ IMPORTANT: prevent browser back/forward cache showing protected page after logout
   window.addEventListener("pageshow", (e) => {
     if (e.persisted) window.location.reload();
   });
@@ -701,11 +633,15 @@ textarea:focus{
   const auth = getAuth(app);
   const db = getFirestore(app);
 
+  // ===== DOM =====
   const logoutBtn = document.getElementById("logoutBtn");
   const tabDashboard = document.getElementById("tabDashboard");
   const tabRequests  = document.getElementById("tabRequests");
+  const tabHistory   = document.getElementById("tabHistory");
+
   const pageDashboard = document.getElementById("pageDashboard");
   const pageRequests  = document.getElementById("pageRequests");
+  const pageHistory   = document.getElementById("pageHistory");
 
   // Profile nodes
   const apName = document.getElementById("apName");
@@ -714,9 +650,10 @@ textarea:focus{
   const apWarden = document.getElementById("apWarden");
   const lineBC = document.getElementById("lineBC");
   const apBC = document.getElementById("apBC");
+  const lineDean = document.getElementById("lineDean");
+  const apDean = document.getElementById("apDean");
 
   // Dashboard filters
-  const fType = document.getElementById("fType");
   const fFrom = document.getElementById("fFrom");
   const fTo   = document.getElementById("fTo");
   const applyFilters = document.getElementById("applyFilters");
@@ -728,27 +665,22 @@ textarea:focus{
   const mRejected = document.getElementById("mRejected");
 
   // Requests filter
-  const reqFilterWrap = document.getElementById("reqFilterWrap");
   const rFrom = document.getElementById("rFrom");
   const rTo = document.getElementById("rTo");
   const applyReqFilters = document.getElementById("applyReqFilters");
 
-  // Tabs
-  const tSingle = document.getElementById("tSingle");
-  const tOne = document.getElementById("tOne");
-  const tExtended = document.getElementById("tExtended");
-
-  const sPending = document.getElementById("sPending");
-  const sApproved = document.getElementById("sApproved");
-  const sRejected = document.getElementById("sRejected");
-
-  const cPending = document.getElementById("cPending");
-  const cApproved = document.getElementById("cApproved");
-  const cRejected = document.getElementById("cRejected");
-
   const requestsContainer = document.getElementById("requestsContainer");
+  const historyContainer = document.getElementById("historyContainer");
 
-  // ===== Reports DOM =====
+  // History tabs
+  const hApproved = document.getElementById("hApproved");
+  const hRejected = document.getElementById("hRejected");
+  const hEscalated = document.getElementById("hEscalated");
+  const hcApproved = document.getElementById("hcApproved");
+  const hcRejected = document.getElementById("hcRejected");
+  const hcEscalated = document.getElementById("hcEscalated");
+
+  // Reports DOM
   const repModeTime = document.getElementById("repModeTime");
   const repModeStudent = document.getElementById("repModeStudent");
   const repRollBox = document.getElementById("repRollBox");
@@ -756,7 +688,6 @@ textarea:focus{
   const repFrom = document.getElementById("repFrom");
   const repTo = document.getElementById("repTo");
   const repYear = document.getElementById("repYear");
-  const repTypes = document.getElementById("repTypes");
   const repDownload = document.getElementById("repDownload");
   const repToast = document.getElementById("repToast");
   const repClear = document.getElementById("repClear");
@@ -764,13 +695,8 @@ textarea:focus{
   const repPreset30 = document.getElementById("repPreset30");
   const repPresetThisMonth = document.getElementById("repPresetThisMonth");
 
+  // ===== State =====
   let repMode = "time"; // time | student
-
-  function showToast(el, msg, type="good"){
-    el.className = "toast show " + (type === "bad" ? "bad" : "good");
-    el.textContent = msg;
-  }
-  function clearToast(el){ el.className = "toast"; el.textContent = ""; }
 
   let currentUserEmailRaw = "";
   let currentUserEmailLower = "";
@@ -779,21 +705,25 @@ textarea:focus{
 
   let canBC = false;
   let canWarden = false;
+  let canDean = false;
 
-  let activeLeaveType = "single";
-  let activeStatus = "pending";
-
-  let dashType = "all";
   let dashFrom = "";
   let dashTo = "";
-
   let reqFrom = "";
   let reqTo = "";
 
-  let cacheAllForApprover = [];
+  let activeHistoryTab = "approved"; // approved | rejected | escalated
 
+  let cacheAllForApprover = []; // pending + acted by me + escalated
   const rosterPhotoCache = new Map();
   const IMG_PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
+
+  // ===== Helpers =====
+  function showToast(el, msg, type="good"){
+    el.className = "toast show " + (type === "bad" ? "bad" : "good");
+    el.textContent = msg;
+  }
+  function clearToast(el){ el.className = "toast"; el.textContent = ""; }
 
   function isoNow(){ return new Date().toISOString(); }
   function normalizeEmail(v){ return String(v || "").trim().toLowerCase(); }
@@ -802,18 +732,18 @@ textarea:focus{
   const YEAR_TO_BATCH = { "1":"Batch 9", "2":"Batch 8" };
 
   function showPage(which){
-    tabDashboard.classList.remove("active");
-    tabRequests.classList.remove("active");
-    pageDashboard.classList.add("hidden");
-    pageRequests.classList.add("hidden");
+    [tabDashboard, tabRequests, tabHistory].forEach(x => x.classList.remove("active"));
+    [pageDashboard, pageRequests, pageHistory].forEach(x => x.classList.add("hidden"));
 
     if(which === "dashboard"){
       tabDashboard.classList.add("active");
       pageDashboard.classList.remove("hidden");
-    }else{
+    } else if (which === "requests") {
       tabRequests.classList.add("active");
       pageRequests.classList.remove("hidden");
-      updateReqFilterVisibility();
+    } else {
+      tabHistory.classList.add("active");
+      pageHistory.classList.remove("hidden");
     }
   }
 
@@ -822,6 +752,13 @@ textarea:focus{
 
   function getOutDT(row){ return row.out_datetime || row.outDT || row.outDateTime || ""; }
   function getInDT(row){ return row.in_datetime || row.inDT || row.inDateTime || ""; }
+
+  function getCurrentHolderEmail(row){
+    return String(row?.current?.holder_email || row?.current_holder_email || row?.currentHolderEmail || row?.current_holder || "").trim();
+  }
+  function getCurrentHolderRole(row){
+    return String(row?.current?.holder_role || row?.current_holder_role || row?.currentRole || "").trim();
+  }
 
   function inDateRangeOutDT(row, fromDate, toDate){
     const outDT = getOutDT(row);
@@ -853,9 +790,13 @@ textarea:focus{
     return true;
   }
 
-  function fmtDT(iso){
-    const dt = new Date(iso);
-    if (isNaN(dt)) return "-";
+  function fmtDT(val){
+    // supports Timestamp / ISO string
+    let dt = null;
+    if (!val) return "-";
+    if (typeof val?.toDate === "function") dt = val.toDate();
+    else dt = new Date(val);
+    if (!dt || isNaN(dt)) return "-";
     const dd = String(dt.getDate()).padStart(2,"0");
     const mm = String(dt.getMonth()+1).padStart(2,"0");
     const yyyy = dt.getFullYear();
@@ -876,26 +817,57 @@ textarea:focus{
     return (a + b).toUpperCase();
   }
 
-  function setLeaveTypeTab(type){
-    activeLeaveType = type;
-    [tSingle,tOne,tExtended].forEach(x => x.classList.remove("active"));
-    if (type === "single") tSingle.classList.add("active");
-    if (type === "one") tOne.classList.add("active");
-    if (type === "extended") tExtended.classList.add("active");
+  function formatLateMinutes(mins){
+    const m = Math.max(0, Number(mins) || 0);
+    const h = Math.floor(m / 60);
+    const r = m % 60;
+    if (h <= 0) return `${r}m`;
+    if (r === 0) return `${h}h`;
+    return `${h}h ${r}m`;
   }
 
-  function setStatusTab(status){
-    activeStatus = status;
-    [sPending,sApproved,sRejected].forEach(x => x.classList.remove("active"));
-    if (status === "pending") sPending.classList.add("active");
-    if (status === "approved") sApproved.classList.add("active");
-    if (status === "rejected") sRejected.classList.add("active");
-    updateReqFilterVisibility();
+  function computeArrivalStatusLine(row){
+    const outVal = getOutDT(row);
+    const out = new Date(String(outVal || ""));
+    if (!outVal || isNaN(out)) return "";
+
+    const now = new Date();
+    if (now < out) return ""; // only after OUT time crossed
+
+    const arrival = row.arrival || {};
+    const verified = !!arrival.verified;
+    if (!verified){
+      return "⚠️ Student not yet reached back";
+    }
+
+    const verifiedAt = arrival.verified_at || arrival.verifiedAt || arrival.verified_time || "";
+    const actual = arrival.actual_in_datetime || arrival.actualInDatetime || "";
+    const lateMinutes = arrival.late_minutes ?? arrival.lateMinutes;
+
+    const lateTxt = (lateMinutes != null) ? `Late by ${formatLateMinutes(lateMinutes)}` : "Late by —";
+    const atTxt = verifiedAt ? fmtDT(verifiedAt) : (actual ? fmtDT(actual) : "—");
+    return `✅ Reached • Verified at ${atTxt} • ${lateTxt}`;
   }
 
-  function updateReqFilterVisibility(){
-    if (activeStatus === "pending") reqFilterWrap.classList.add("hidden");
-    else reqFilterWrap.classList.remove("hidden");
+  function isWeekendBlock(outVal){
+    const d = new Date(String(outVal || ""));
+    if (isNaN(d)) return false;
+    const dow = d.getDay(); // 0 Sun .. 6 Sat
+    // Weekend = Fri + Sat only (as you defined)
+    return dow === 5 || dow === 6;
+  }
+
+  function ordinal(n){
+    const s=["th","st","nd","rd"], v=n%100;
+    return n + (s[(v-20)%10]||s[v]||s[0]);
+  }
+
+  function monthKeyFromOut(outVal){
+    const d = new Date(String(outVal||""));
+    if (isNaN(d)) return "";
+    const y = d.getFullYear();
+    const m = String(d.getMonth()+1).padStart(2,"0");
+    return `${y}-${m}`;
   }
 
   function chainEntryForMe(chain){
@@ -908,40 +880,54 @@ textarea:focus{
     }) || null;
   }
 
-  function didIApproveThis(chain){
+  function didIAct(chain){
     const entry = chainEntryForMe(chain);
-    if (!entry) return false;
-    const st = String(entry.status || entry.action || "").toLowerCase();
-    return st === "approved";
+    if (!entry) return null;
+    const st = String(entry.action || entry.status || "").toLowerCase();
+    if (st === "approved") return "approved";
+    if (st === "rejected") return "rejected";
+    return null;
   }
 
-  function nextHolderEmail(chain){
-    const arr = Array.isArray(chain) ? chain : [];
-    const pending = arr.find(x => String(x?.status || x?.action || "").toLowerCase() === "pending");
-    return pending ? normalizeEmail(pending.email) : null;
+  function isFinalApprovedStatus(st){
+    const s = String(st || "").toLowerCase();
+    return s === "approved_final" || s === "approved_dean_final";
   }
 
-  function ensureApproverEmailsFromChain(chain){
-    const arr = Array.isArray(chain) ? chain : [];
-    return arr.map(x => normalizeEmail(x?.email)).filter(Boolean);
+  function isFinalRejectedStatus(st){
+    const s = String(st || "").toLowerCase();
+    return s === "rejected_l1" || s === "rejected_dean";
+  }
+
+  function isPendingForMe(row){
+    const holder = getCurrentHolderEmail(row);
+    const holderOk = holder === currentUserEmailRaw || holder.toLowerCase() === currentUserEmailLower;
+    const st = String(row.status || "").toLowerCase();
+    return holderOk && (st === "pending_l1" || st === "pending_dean");
   }
 
   function computeCapabilitiesFromRoleDoc(d){
     const bcYears = Array.isArray(d?.bc_years) ? d.bc_years.map(x => String(x)) : [];
     const wardenHostels = Array.isArray(d?.warden_hostels) ? d.warden_hostels.map(x => String(x).toLowerCase()) : [];
-
     canBC = bcYears.some(y => y === "1" || y === "2");
     canWarden = wardenHostels.length > 0;
-
+    canDean = (roleType === "dean");
     return { bcYears, wardenHostels };
   }
 
   function updateApproverUI(){
-    const name = String(roleDoc?.name || "").trim() || "Approver";
+    const name = String(roleDoc?.name || "").trim() || (canDean ? "Dean" : "Approver");
     apName.textContent = name;
     apEmail.textContent = currentUserEmailRaw;
 
     const { bcYears, wardenHostels } = computeCapabilitiesFromRoleDoc(roleDoc);
+
+    if (canDean){
+      lineDean.style.display = "block";
+      apDean.textContent = "Active";
+    } else {
+      lineDean.style.display = "none";
+    }
 
     if (wardenHostels.length){
       lineWarden.style.display = "block";
@@ -965,17 +951,6 @@ textarea:focus{
       apBC.textContent = batches;
     } else {
       lineBC.style.display = "none";
-    }
-  }
-
-  function applyRoleBasedVisibility(){
-    if (!canBC){
-      tSingle.classList.add("hidden");
-      if (activeLeaveType === "single"){
-        setLeaveTypeTab("one");
-      }
-    } else {
-      tSingle.classList.remove("hidden");
     }
   }
 
@@ -1008,7 +983,7 @@ textarea:focus{
       return snapRaw.data();
     }
 
-    throw new Error("Access denied. You are not assigned as Batch Coordinator or Warden.");
+    throw new Error("Access denied. You are not assigned as Batch Coordinator / Warden / Dean.");
   }
 
   async function tryGetDocs(qLower, qRaw){
@@ -1021,130 +996,7 @@ textarea:focus{
     }
   }
 
-  async function refreshCache(){
-    const meLower = currentUserEmailLower;
-    const meRaw = currentUserEmailRaw;
-
-    const qPendingLower = query(collection(db, "leave_requests"),
-      where("current_holder_email", "==", meLower),
-      where("status", "==", "pending")
-    );
-    const qPendingRaw = query(collection(db, "leave_requests"),
-      where("current_holder_email", "==", meRaw),
-      where("status", "==", "pending")
-    );
-    const pendingRows = await tryGetDocs(qPendingLower, qPendingRaw);
-
-    const qMineLower = query(collection(db, "leave_requests"),
-      where("approver_emails", "array-contains", meLower)
-    );
-    const qMineRaw = query(collection(db, "leave_requests"),
-      where("approver_emails", "array-contains", meRaw)
-    );
-
-    let mineAll = [];
-    try { mineAll = await tryGetDocs(qMineLower, qMineRaw); }
-    catch(e){ mineAll = []; }
-
-    const actedByMeRows = mineAll.filter(r => {
-      const entry = chainEntryForMe(r.approver_chain);
-      if (!entry) return false;
-      const mySt = String(entry.status || entry.action || "").toLowerCase();
-      return mySt === "approved" || mySt === "rejected";
-    });
-
-    const map = new Map();
-    [...pendingRows, ...actedByMeRows].forEach(r => map.set(r.id, r));
-    cacheAllForApprover = [...map.values()];
-  }
-
-  function computeDashboardMetrics(){
-    const meLower = currentUserEmailLower;
-    const meRaw = currentUserEmailRaw;
-
-    const rows = cacheAllForApprover.filter(r => {
-      if (dashType !== "all" && String(r.leave_type||"") !== dashType) return false;
-      if (!inDateRangeOutDT(r, dashFrom, dashTo)) return false;
-      return true;
-    });
-
-    const total = rows.length;
-
-    const pending = rows.filter(r => {
-      const holder = String(r.current_holder_email || "").trim();
-      const holderOk = holder === meRaw || holder.toLowerCase() === meLower;
-      return holderOk && String(r.status || "").toLowerCase() === "pending";
-    }).length;
-
-    const approved = rows.filter(r => {
-      const e = chainEntryForMe(r.approver_chain);
-      return e && String(e.status || e.action || "").toLowerCase() === "approved";
-    }).length;
-
-    const rejected = rows.filter(r => {
-      const e = chainEntryForMe(r.approver_chain);
-      return e && String(e.status || e.action || "").toLowerCase() === "rejected";
-    }).length;
-
-    mTotal.textContent = String(total);
-    mPending.textContent = String(pending);
-    mApproved.textContent = String(approved);
-    mRejected.textContent = String(rejected);
-  }
-
-  function filteredForRequests(){
-    const meLower = currentUserEmailLower;
-    const meRaw = currentUserEmailRaw;
-
-    return cacheAllForApprover.filter(r => {
-      if (String(r.leave_type || "") !== activeLeaveType) return false;
-
-      if (activeStatus !== "pending"){
-        if (!inDateRangeOutDT(r, reqFrom, reqTo)) return false;
-      }
-
-      if (activeStatus === "pending"){
-        const holder = String(r.current_holder_email || "").trim();
-        const holderOk = holder === meRaw || holder.toLowerCase() === meLower;
-        return holderOk && String(r.status || "").toLowerCase() === "pending";
-      }
-
-      const entry = chainEntryForMe(r.approver_chain);
-      if (!entry) return false;
-      return String(entry.status || entry.action || "").toLowerCase() === activeStatus;
-    });
-  }
-
-  function updateStatusCounts(){
-    const meLower = currentUserEmailLower;
-    const meRaw = currentUserEmailRaw;
-
-    const base = cacheAllForApprover.filter(r => String(r.leave_type || "") === activeLeaveType);
-
-    const pending = base.filter(r => {
-      const holder = String(r.current_holder_email || "").trim();
-      const holderOk = holder === meRaw || holder.toLowerCase() === meLower;
-      return holderOk && String(r.status || "").toLowerCase() === "pending";
-    }).length;
-
-    const approved = base.filter(r => {
-      if (!inDateRangeOutDT(r, reqFrom, reqTo)) return false;
-      const e = chainEntryForMe(r.approver_chain);
-      return e && String(e.status || e.action || "").toLowerCase() === "approved";
-    }).length;
-
-    const rejected = base.filter(r => {
-      if (!inDateRangeOutDT(r, reqFrom, reqTo)) return false;
-      const e = chainEntryForMe(r.approver_chain);
-      return e && String(e.status || e.action || "").toLowerCase() === "rejected";
-    }).length;
-
-    cPending.textContent = String(pending);
-    cApproved.textContent = String(approved);
-    cRejected.textContent = String(rejected);
-  }
-
-  // ===== Photo helpers (unchanged) =====
+  // ===== Photo helpers (same as your old) =====
   function extractDriveId(url){
     const u = String(url || "").trim();
     if (!u) return "";
@@ -1237,8 +1089,114 @@ textarea:focus{
     img.src = primary;
   }
 
-  function renderRequests(){
-    const rows = filteredForRequests();
+  // ===== Cache refresh (new statuses) =====
+  async function refreshCache(){
+    const meLower = currentUserEmailLower;
+    const meRaw = currentUserEmailRaw;
+
+    // Pending assigned to me
+    const qPendingLower = query(collection(db, "leave_requests"),
+      where("current.holder_email", "==", meLower)
+    );
+    const qPendingRaw = query(collection(db, "leave_requests"),
+      where("current.holder_email", "==", meRaw)
+    );
+    const pendingRows = await tryGetDocs(qPendingLower, qPendingRaw);
+
+    // All my-involved (history)
+    const qMineLower = query(collection(db, "leave_requests"),
+      where("approver_emails", "array-contains", meLower)
+    );
+    const qMineRaw = query(collection(db, "leave_requests"),
+      where("approver_emails", "array-contains", meRaw)
+    );
+    let mineAll = [];
+    try { mineAll = await tryGetDocs(qMineLower, qMineRaw); }
+    catch(e){ mineAll = []; }
+
+    // Keep:
+    // - pending for me
+    // - anything where I approved/rejected
+    // - anything escalated (requested true) where I'm in chain (for escalated history)
+    const actedOrEscalated = mineAll.filter(r => {
+      const acted = didIAct(r.approver_chain);
+      if (acted) return true;
+      if (r?.escalation?.requested) return true;
+      return false;
+    });
+
+    const map = new Map();
+    [...pendingRows, ...actedOrEscalated].forEach(r => map.set(r.id, r));
+    cacheAllForApprover = [...map.values()];
+  }
+
+  function computeDashboardMetrics(){
+    const meLower = currentUserEmailLower;
+    const meRaw = currentUserEmailRaw;
+
+    const rows = cacheAllForApprover.filter(r => {
+      if (!inDateRangeOutDT(r, dashFrom, dashTo)) return false;
+      return true;
+    });
+
+    const total = rows.length;
+
+    const pending = rows.filter(r => isPendingForMe(r)).length;
+
+    const approved = rows.filter(r => {
+      const acted = didIAct(r.approver_chain);
+      return acted === "approved";
+    }).length;
+
+    const rejected = rows.filter(r => {
+      const acted = didIAct(r.approver_chain);
+      return acted === "rejected";
+    }).length;
+
+    mTotal.textContent = String(total);
+    mPending.textContent = String(pending);
+    mApproved.textContent = String(approved);
+    mRejected.textContent = String(rejected);
+  }
+
+  // ===== Weekend Approved Counter (Fri+Sat, final approved only) =====
+  function buildWeekendApprovedCounters(){
+    // Map: monthKey -> roll -> countIndex
+    const counters = new Map(); // monthKey -> Map(roll -> n)
+    const indexForRequest = new Map(); // requestId -> index
+
+    // Consider only final approved
+    const rows = cacheAllForApprover
+      .filter(r => isFinalApprovedStatus(r.status))
+      .filter(r => isWeekendBlock(getOutDT(r)));
+
+    // sort by out_datetime asc so 1st approved weekend is stable
+    rows.sort((a,b) => String(getOutDT(a)||"").localeCompare(String(getOutDT(b)||"")));
+
+    for (const r of rows){
+      const roll = normalizeRollno(r.student_rollno || "");
+      const mk = r.month_key || monthKeyFromOut(getOutDT(r)) || "";
+      if (!roll || !mk) continue;
+
+      if (!counters.has(mk)) counters.set(mk, new Map());
+      const mm = counters.get(mk);
+
+      const prev = mm.get(roll) || 0;
+      const next = prev + 1;
+      mm.set(roll, next);
+      indexForRequest.set(r.id, next);
+    }
+
+    return indexForRequest;
+  }
+
+  // ===== Render Pending Requests =====
+  function renderPendingRequests(){
+    const rows = cacheAllForApprover
+      .filter(r => isPendingForMe(r))
+      .filter(r => inDateRangeOutDT(r, reqFrom, reqTo));
+
+    // sort newest out first
     rows.sort((a,b) => String(getOutDT(b)||"").localeCompare(String(getOutDT(a)||"")));
 
     requestsContainer.innerHTML = "";
@@ -1248,38 +1206,41 @@ textarea:focus{
       empty.style.padding = "14px";
       empty.style.color = "#64748b";
       empty.style.fontWeight = "850";
-      empty.textContent = "No requests found for the selected filters.";
+      empty.textContent = "No pending requests assigned to you.";
       requestsContainer.appendChild(empty);
       return;
     }
 
-    rows.forEach(r => {
-      const statusOverall = String(r.status || "pending").toLowerCase();
-      const badgeClass =
-        statusOverall === "approved" ? "approved" :
-        statusOverall === "rejected" ? "rejected" : "pending";
+    const weekendIndex = buildWeekendApprovedCounters();
 
-      const studentName = r.student_name || r.student?.name || "—";
-      const roll = normalizeRollno(r.student_rollno || r.student?.rollno || "");
-      const room = r.student_room_no || r.student?.room || r.student?.roomNo || "—";
-      const reason = r.reason || "-";
+    rows.forEach(r => {
+      const st = String(r.status || "").toLowerCase();
+      const badgeClass = (st.includes("pending")) ? "pending" : (st.includes("approved") ? "approved" : "rejected");
+
+      const studentName = r.student_name || "—";
+      const roll = normalizeRollno(r.student_rollno || "");
+      const room = r.student_room_no || "—";
+
+      const reasonCat = String(r.reason_category || r.reasonCategory || "—").trim();
+      const reasonTxt = String(r.reason_text || r.reasonText || r.reason || "").trim();
+      const reasonLine = reasonTxt ? `${reasonCat} — ${reasonTxt}` : reasonCat;
 
       const outVal = getOutDT(r);
       const inVal  = getInDT(r);
 
-      const myEntry = chainEntryForMe(r.approver_chain);
-      const myAction = String(myEntry?.status || myEntry?.action || "").toLowerCase();
-      const forwarded = (myAction === "approved" && statusOverall === "pending");
+      const arrivalLine = computeArrivalStatusLine(r);
+
+      // Escalation checkbox only for L1 (BC/Warden) and only if current stage is L1
+      const holderRole = getCurrentHolderRole(r).toLowerCase();
+      const canEscalate = (holderRole === "batch_coordinator" || holderRole === "warden") && !!(r.routing && r.routing.dean_email);
+
+      const remarkId = `remark_${r.id}`;
+      const escId = `esc_${r.id}`;
+
+      const weekendTag = isWeekendBlock(outVal) ? "WEEKEND BLOCK (Fri/Sat)" : "WEEKDAY";
 
       const card = document.createElement("section");
       card.className = "requestCard";
-      const remarkId = `remark_${r.id}`;
-
-      const countLineHTML =
-        (activeStatus === "pending")
-          ? `<div class="reqCountLine">Request #${r.grant_index_in_month || 1} this month</div>`
-          : (forwarded ? `<div class="reqCountLine">✅ You approved • Waiting for next approver</div>` : "");
-
       card.innerHTML = `
         <div class="cardTop">
           <div class="studentBlock">
@@ -1287,46 +1248,33 @@ textarea:focus{
             <div class="studentAvatar">${initials(studentName)}</div>
             <div class="studentText">
               <div class="studentName">${studentName}</div>
-              <div class="studentMeta">${(roll||"—")} • Room ${room}</div>
-              ${countLineHTML}
+              <div class="studentMeta">${(roll||"—")} • Room ${room} • ${weekendTag}</div>
+              ${arrivalLine ? `<div class="reqCountLine">${arrivalLine}</div>` : ``}
             </div>
           </div>
-          <div class="badge ${badgeClass}">${statusOverall.toUpperCase()}</div>
+          <div class="badge ${badgeClass}">${st.toUpperCase()}</div>
         </div>
 
         <div class="details">
           <div class="kv"><div class="k">OUT DATE & TIME</div><div class="v">${fmtDT(outVal)}</div></div>
           <div class="kv"><div class="k">IN DATE & TIME</div><div class="v">${fmtDT(inVal)}</div></div>
-          <div class="kv reasonBox"><div class="k">REASON</div><div class="v">${reason}</div></div>
+          <div class="kv reasonBox"><div class="k">REASON</div><div class="v">${reasonLine || "-"}</div></div>
         </div>
 
         <textarea id="${remarkId}" placeholder="Remark (optional)"></textarea>
+
+        ${canEscalate ? `
+          <label class="inlineOpt">
+            <input type="checkbox" id="${escId}">
+            Escalate to Dean after my approval
+          </label>
+        ` : ``}
 
         <div class="actions">
           <button class="actionBtn approveBtn" data-id="${r.id}" type="button">Approve</button>
           <button class="actionBtn rejectBtn" data-id="${r.id}" type="button">Reject</button>
         </div>
       `;
-
-      const holder = String(r.current_holder_email || "").trim();
-      const holderOk = holder === currentUserEmailRaw || holder.toLowerCase() === currentUserEmailLower;
-
-      let canAct = false;
-      if (activeStatus === "pending") {
-        canAct = holderOk && statusOverall === "pending";
-      } else if (activeStatus === "rejected") {
-        canAct = statusOverall === "rejected";
-      } else {
-        canAct = false;
-      }
-
-      if (!canAct){
-        card.querySelector(".approveBtn").disabled = true;
-        card.querySelector(".rejectBtn").disabled = true;
-        card.querySelector(`#${remarkId}`).disabled = true;
-      } else {
-        if (activeStatus === "rejected") card.querySelector(".rejectBtn").disabled = true;
-      }
 
       requestsContainer.appendChild(card);
       hydrateStudentPhoto(card, roll, studentName, r);
@@ -1340,7 +1288,106 @@ textarea:focus{
     });
   }
 
-  // ✅ Creates/updates public gatepass doc so QR works even without login
+  // ===== History Render =====
+  function setHistoryTab(which){
+    activeHistoryTab = which;
+    [hApproved, hRejected, hEscalated].forEach(x => x.classList.remove("active"));
+    if (which === "approved") hApproved.classList.add("active");
+    if (which === "rejected") hRejected.classList.add("active");
+    if (which === "escalated") hEscalated.classList.add("active");
+    renderHistory();
+  }
+
+  function renderHistory(){
+    let rows = cacheAllForApprover.slice();
+
+    if (activeHistoryTab === "approved"){
+      rows = rows.filter(r => didIAct(r.approver_chain) === "approved");
+    } else if (activeHistoryTab === "rejected"){
+      rows = rows.filter(r => didIAct(r.approver_chain) === "rejected");
+    } else {
+      // escalated: show pending + dean-approved + dean-rejected
+      rows = rows.filter(r => !!(r?.escalation?.requested));
+    }
+
+    // Sort newest out first
+    rows.sort((a,b) => String(getOutDT(b)||"").localeCompare(String(getOutDT(a)||"")));
+
+    // Counts
+    hcApproved.textContent = String(cacheAllForApprover.filter(r => didIAct(r.approver_chain) === "approved").length);
+    hcRejected.textContent = String(cacheAllForApprover.filter(r => didIAct(r.approver_chain) === "rejected").length);
+    hcEscalated.textContent = String(cacheAllForApprover.filter(r => !!(r?.escalation?.requested)).length);
+
+    historyContainer.innerHTML = "";
+
+    if (!rows.length){
+      const empty = document.createElement("div");
+      empty.style.padding = "14px";
+      empty.style.color = "#64748b";
+      empty.style.fontWeight = "850";
+      empty.textContent = "No records found.";
+      historyContainer.appendChild(empty);
+      return;
+    }
+
+    const weekendIndex = buildWeekendApprovedCounters();
+
+    for (const r of rows){
+      const st = String(r.status || "").toLowerCase();
+      const badgeClass =
+        st.includes("pending") ? "pending" :
+        st.includes("approved") ? "approved" :
+        st.includes("rejected") ? "rejected" : "pending";
+
+      const studentName = r.student_name || "—";
+      const roll = normalizeRollno(r.student_rollno || "");
+      const room = r.student_room_no || "—";
+
+      const reasonCat = String(r.reason_category || "—").trim();
+      const reasonTxt = String(r.reason_text || r.reason || "").trim();
+      const reasonLine = reasonTxt ? `${reasonCat} — ${reasonTxt}` : reasonCat;
+
+      const outVal = getOutDT(r);
+      const inVal  = getInDT(r);
+
+      const arrivalLine = computeArrivalStatusLine(r);
+
+      // weekend approved count line (only meaningful for weekend leaves)
+      let reqCountHTML = "";
+      if (isWeekendBlock(outVal) && isFinalApprovedStatus(r.status)){
+        const idx = weekendIndex.get(r.id) || 1;
+        reqCountHTML = `<div class="reqCountLine">${ordinal(idx)} weekend request of the month</div>`;
+      }
+
+      const card = document.createElement("section");
+      card.className = "requestCard";
+      card.innerHTML = `
+        <div class="cardTop">
+          <div class="studentBlock">
+            <img class="studentPhoto" src="${IMG_PLACEHOLDER}" alt="Student photo" style="display:none;">
+            <div class="studentAvatar">${initials(studentName)}</div>
+            <div class="studentText">
+              <div class="studentName">${studentName}</div>
+              <div class="studentMeta">${(roll||"—")} • Room ${room}</div>
+              ${reqCountHTML}
+              ${arrivalLine ? `<div class="reqCountLine">${arrivalLine}</div>` : ``}
+            </div>
+          </div>
+          <div class="badge ${badgeClass}">${st.toUpperCase()}</div>
+        </div>
+
+        <div class="details">
+          <div class="kv"><div class="k">OUT DATE & TIME</div><div class="v">${fmtDT(outVal)}</div></div>
+          <div class="kv"><div class="k">IN DATE & TIME</div><div class="v">${fmtDT(inVal)}</div></div>
+          <div class="kv reasonBox"><div class="k">REASON</div><div class="v">${reasonLine || "-"}</div></div>
+        </div>
+      `;
+      historyContainer.appendChild(card);
+      hydrateStudentPhoto(card, roll, studentName, r);
+    }
+  }
+
+  // ===== Gatepass Public =====
   async function upsertPublicGatepass(requestId, requestRow){
     const outVal = getOutDT(requestRow);
     const inVal = getInDT(requestRow);
@@ -1348,17 +1395,17 @@ textarea:focus{
     const payload = {
       status: "approved",
       approved_public_at: isoNow(),
-      student_name: requestRow.student_name || requestRow.student?.name || "",
-      student_rollno: requestRow.student_rollno || requestRow.student?.rollno || "",
-      student_room_no: requestRow.student_room_no || requestRow.student?.room || requestRow.student?.roomNo || "",
-      student_email: requestRow.student_email || requestRow.studentEmail || requestRow.student?.email || "",
-      student_uid: requestRow.student_uid || requestRow.studentUid || requestRow.student?.uid || "",
-      leave_type: requestRow.leave_type || "",
+      student_name: requestRow.student_name || "",
+      student_rollno: requestRow.student_rollno || "",
+      student_room_no: requestRow.student_room_no || "",
+      student_email: requestRow.student_email || "",
+      student_uid: requestRow.student_uid || "",
       out_datetime: outVal || "",
       in_datetime: inVal || "",
-      reason: requestRow.reason || "",
-      contact_no: requestRow.contact_no || requestRow.phone || requestRow.contact || "",
-      photo_url: requestRow.photo_url || requestRow.photoUrl || requestRow.student_photo_url || "",
+      reason_category: requestRow.reason_category || "",
+      reason_text: requestRow.reason_text || requestRow.reason || "",
+      contact_no: requestRow.contact_no || "",
+      photo_url: requestRow.student_photo_url || requestRow.photo_url || "",
       updatedAt: serverTimestamp(),
       updated_at: serverTimestamp()
     };
@@ -1366,91 +1413,147 @@ textarea:focus{
     await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
   }
 
-  async function handleApprove(requestId){
-    const r = cacheAllForApprover.find(x => x.id === requestId);
-    if (!r) return;
+  // ===== Approve / Reject (new routing policy) =====
+  function ensureDeanStage(chain, deanEmail){
+    const arr = Array.isArray(chain) ? [...chain] : [];
+    const exists = arr.some(x => String(x?.role || "").toLowerCase() === "dean");
+    if (exists) return arr;
 
-    const statusOverall = String(r.status || "").toLowerCase();
+    const nextStage = arr.length ? Math.max(...arr.map(x => Number(x.stage)||0)) + 1 : 2;
+    arr.push({
+      stage: nextStage,
+      role: "dean",
+      email: normalizeEmail(deanEmail),
+      action: "pending",
+      acted_at: null,
+      remark: ""
+    });
+    return arr;
+  }
 
-    if (activeStatus === "pending"){
-      const holder = String(r.current_holder_email || "").trim();
-      const holderOk = holder === currentUserEmailRaw || holder.toLowerCase() === currentUserEmailLower;
-      if (!holderOk) return;
-      if (statusOverall !== "pending") return;
-    }
+  function markMyChainAction(chain, action, remark){
+    const arr = Array.isArray(chain) ? [...chain] : [];
+    const meLower = currentUserEmailLower;
+    const meRaw = currentUserEmailRaw;
 
-    if (activeStatus === "rejected"){
-      if (statusOverall !== "rejected") return;
-    }
-
-    const remark = (document.getElementById(`remark_${requestId}`)?.value || "").trim();
-    const chain = Array.isArray(r.approver_chain) ? [...r.approver_chain] : [];
-
-    let idx = chain.findIndex(x => {
+    let idx = arr.findIndex(x => {
       const e = String(x?.email || "").trim();
-      const ok = e === currentUserEmailRaw || e.toLowerCase() === currentUserEmailLower;
-      return ok && String(x?.status || x?.action || "").toLowerCase() === "pending";
+      const ok = e === meRaw || e.toLowerCase() === meLower;
+      const st = String(x?.action || x?.status || "").toLowerCase();
+      return ok && (st === "pending" || st === ""); // pending stage for me
     });
 
     if (idx === -1){
-      const anyMine = chain.findIndex(x => {
+      // fallback: any entry for me
+      idx = arr.findIndex(x => {
         const e = String(x?.email || "").trim();
-        return e === currentUserEmailRaw || e.toLowerCase() === currentUserEmailLower;
+        return e === meRaw || e.toLowerCase() === meLower;
       });
-      if (anyMine >= 0) idx = anyMine;
     }
 
     if (idx >= 0){
-      chain[idx] = { ...chain[idx], status:"approved", action:"approved", actedAt: isoNow(), acted_at: isoNow(), remark: remark || "" };
+      arr[idx] = { ...arr[idx], action, status: action, acted_at: isoNow(), actedAt: isoNow(), remark: remark || "" };
     } else {
-      chain.push({
-        stage: chain.length + 1,
-        email: currentUserEmailLower,
-        role_context: ["approver_override"],
-        status: "approved",
-        action: "approved",
-        actedAt: isoNow(),
+      arr.push({
+        stage: arr.length + 1,
+        role: canDean ? "dean" : "approver_override",
+        email: meLower,
+        action,
+        status: action,
         acted_at: isoNow(),
         remark: remark || ""
       });
     }
 
-    const nextEmail = nextHolderEmail(chain);
+    return arr;
+  }
+
+  async function handleApprove(requestId){
+    const r = cacheAllForApprover.find(x => x.id === requestId);
+    if (!r) return;
+
+    if (!isPendingForMe(r)) return;
+
+    const st = String(r.status || "").toLowerCase();
+    const holderRole = getCurrentHolderRole(r).toLowerCase();
+
+    const remark = (document.getElementById(`remark_${requestId}`)?.value || "").trim();
+    const chain0 = Array.isArray(r.approver_chain) ? r.approver_chain : [];
+    let chain = markMyChainAction(chain0, "approved", remark);
 
     const updates = {
       approver_chain: chain,
-      approver_emails: ensureApproverEmailsFromChain(chain),
+      approver_emails: (Array.isArray(r.approver_emails) ? r.approver_emails : []).length ? r.approver_emails : chain.map(x => normalizeEmail(x.email)).filter(Boolean),
       updated_at: serverTimestamp(),
       updatedAt: serverTimestamp()
     };
 
-    let isFinalApproved = false;
+    let finalApproved = false;
 
-    if (nextEmail){
-      updates.current_holder_email = nextEmail;
-      updates.status = "pending";
-    } else {
+    // If Dean is approving (pending_dean) => final approved by dean
+    if (holderRole === "dean" || st === "pending_dean"){
+      updates.status = "approved_dean_final";
+      updates.current = { holder_email: null, holder_role: "", stage: "" };
       updates.current_holder_email = null;
-      updates.status = "approved";
-      updates.final_approved_by = currentUserEmailLower;
-      updates.final_approved_at = isoNow();
-      isFinalApproved = true;
+
+      updates.escalation = {
+        ...(r.escalation || {}),
+        dean_action: "approved"
+      };
+
+      finalApproved = true;
+    } else {
+      // L1 approving
+      const deanEmail = r?.routing?.dean_email || "";
+      const escEl = document.getElementById(`esc_${requestId}`);
+      const wantEsc = !!(escEl && escEl.checked);
+
+      if (wantEsc && deanEmail){
+        // escalate to dean
+        chain = ensureDeanStage(chain, deanEmail);
+        updates.approver_chain = chain;
+        updates.status = "pending_dean";
+        updates.current = { holder_email: normalizeEmail(deanEmail), holder_role: "dean", stage: "DEAN" };
+        updates.current_holder_email = normalizeEmail(deanEmail);
+
+        updates.escalation = {
+          ...(r.escalation || {}),
+          requested: true,
+          requested_by: currentUserEmailLower,
+          requested_at: serverTimestamp(),
+          reason: ""
+        };
+      } else {
+        // final approved at L1
+        updates.status = "approved_final";
+        updates.current = { holder_email: null, holder_role: "", stage: "" };
+        updates.current_holder_email = null;
+
+        updates.escalation = {
+          ...(r.escalation || {}),
+          requested: false,
+          dean_action: "not_required"
+        };
+
+        finalApproved = true;
+      }
     }
 
     try{
       await updateDoc(doc(db, "leave_requests", requestId), updates);
 
-      if (isFinalApproved){
+      if (finalApproved){
         await upsertPublicGatepass(requestId, { ...r, ...updates });
       }
 
       await refreshCache();
       computeDashboardMetrics();
-      updateStatusCounts();
-      renderRequests();
+      renderPendingRequests();
+      renderHistory();
+      updateHistoryCounts();
     }catch(e){
       console.error(e);
-      alert("Unable to approve. Check Firestore rules / data.");
+      alert("Unable to approve. Check Firestore rules / indexes.");
     }
   }
 
@@ -1458,48 +1561,61 @@ textarea:focus{
     const r = cacheAllForApprover.find(x => x.id === requestId);
     if (!r) return;
 
-    const holder = String(r.current_holder_email || "").trim();
-    const holderOk = holder === currentUserEmailRaw || holder.toLowerCase() === currentUserEmailLower;
-    if (!holderOk) return;
-    if (String(r.status || "").toLowerCase() !== "pending") return;
+    if (!isPendingForMe(r)) return;
+
+    const st = String(r.status || "").toLowerCase();
+    const holderRole = getCurrentHolderRole(r).toLowerCase();
 
     const remark = (document.getElementById(`remark_${requestId}`)?.value || "").trim();
-    const chain = Array.isArray(r.approver_chain) ? [...r.approver_chain] : [];
-
-    const idx = chain.findIndex(x => {
-      const e = String(x?.email || "").trim();
-      const ok = e === currentUserEmailRaw || e.toLowerCase() === currentUserEmailLower;
-      return ok && String(x?.status || x?.action || "").toLowerCase() === "pending";
-    });
-
-    if (idx === -1){
-      alert("This request is not assigned to you.");
-      return;
-    }
-
-    chain[idx] = { ...chain[idx], status:"rejected", action:"rejected", actedAt: isoNow(), acted_at: isoNow(), remark: remark || "" };
+    const chain0 = Array.isArray(r.approver_chain) ? r.approver_chain : [];
+    const chain = markMyChainAction(chain0, "rejected", remark);
 
     const updates = {
       approver_chain: chain,
-      approver_emails: ensureApproverEmailsFromChain(chain),
-      current_holder_email: null,
-      status: "rejected",
+      approver_emails: (Array.isArray(r.approver_emails) ? r.approver_emails : []).length ? r.approver_emails : chain.map(x => normalizeEmail(x.email)).filter(Boolean),
       updated_at: serverTimestamp(),
-      updatedAt: serverTimestamp()
+      updatedAt: serverTimestamp(),
+      current: { holder_email: null, holder_role: "", stage: "" },
+      current_holder_email: null
     };
+
+    if (holderRole === "dean" || st === "pending_dean"){
+      updates.status = "rejected_dean";
+      updates.escalation = {
+        ...(r.escalation || {}),
+        dean_action: "rejected"
+      };
+    } else {
+      updates.status = "rejected_l1";
+      // if it was escalated before reject (rare), still show in escalated history
+      updates.escalation = {
+        ...(r.escalation || {}),
+        dean_action: r?.escalation?.requested ? "pending" : "not_required"
+      };
+    }
 
     try{
       await updateDoc(doc(db, "leave_requests", requestId), updates);
+
       await refreshCache();
       computeDashboardMetrics();
-      updateStatusCounts();
-      renderRequests();
+      renderPendingRequests();
+      renderHistory();
+      updateHistoryCounts();
     }catch(e){
       console.error(e);
-      alert("Unable to reject. Check Firestore rules / data.");
+      alert("Unable to reject. Check Firestore rules / indexes.");
     }
   }
 
+  // ===== History counts =====
+  function updateHistoryCounts(){
+    hcApproved.textContent = String(cacheAllForApprover.filter(r => didIAct(r.approver_chain) === "approved").length);
+    hcRejected.textContent = String(cacheAllForApprover.filter(r => didIAct(r.approver_chain) === "rejected").length);
+    hcEscalated.textContent = String(cacheAllForApprover.filter(r => !!(r?.escalation?.requested)).length);
+  }
+
+  // ===== Buttons / events =====
   logoutBtn.addEventListener("click", async () => {
     try{ await signOut(auth); }catch(_){}
     window.location.replace("../index.html");
@@ -1508,36 +1624,33 @@ textarea:focus{
   tabDashboard.addEventListener("click", () => showPage("dashboard"));
   tabRequests.addEventListener("click", () => {
     showPage("requests");
-    updateStatusCounts();
-    renderRequests();
+    renderPendingRequests();
+  });
+  tabHistory.addEventListener("click", () => {
+    showPage("history");
+    renderHistory();
   });
 
   applyFilters.addEventListener("click", async () => {
-    dashType = fType.value || "all";
     dashFrom = fFrom.value || "";
     dashTo = fTo.value || "";
     await refreshCache();
     computeDashboardMetrics();
+    updateHistoryCounts();
   });
 
   applyReqFilters.addEventListener("click", () => {
     reqFrom = rFrom.value || "";
     reqTo = rTo.value || "";
-    if (activeStatus !== "pending"){
-      updateStatusCounts();
-      renderRequests();
-    }
+    renderPendingRequests();
   });
 
-  tSingle.addEventListener("click", () => { setLeaveTypeTab("single"); updateStatusCounts(); renderRequests(); });
-  tOne.addEventListener("click", () => { setLeaveTypeTab("one"); updateStatusCounts(); renderRequests(); });
-  tExtended.addEventListener("click", () => { setLeaveTypeTab("extended"); updateStatusCounts(); renderRequests(); });
+  // History tab events
+  hApproved.addEventListener("click", () => setHistoryTab("approved"));
+  hRejected.addEventListener("click", () => setHistoryTab("rejected"));
+  hEscalated.addEventListener("click", () => setHistoryTab("escalated"));
 
-  sPending.addEventListener("click", () => { setStatusTab("pending"); updateStatusCounts(); renderRequests(); });
-  sApproved.addEventListener("click", () => { setStatusTab("approved"); updateStatusCounts(); renderRequests(); });
-  sRejected.addEventListener("click", () => { setStatusTab("rejected"); updateStatusCounts(); renderRequests(); });
-
-  // ===== Reports UI behavior =====
+  // ===== Reports UI =====
   function setRepMode(mode){
     repMode = mode;
     repModeTime.classList.toggle("active", mode === "time");
@@ -1548,36 +1661,6 @@ textarea:focus{
   repModeTime.addEventListener("click", () => setRepMode("time"));
   repModeStudent.addEventListener("click", () => setRepMode("student"));
 
-  function setChip(el, on){
-    el.classList.toggle("on", !!on);
-    const cb = el.querySelector("input[type=checkbox]");
-    if (cb) cb.checked = !!on;
-  }
-
-  repTypes.querySelectorAll(".chip").forEach(ch => {
-    ch.addEventListener("click", (e) => {
-      // allow clicking label without double toggling
-      if (e.target && e.target.tagName === "INPUT") return;
-      const cb = ch.querySelector("input[type=checkbox]");
-      const next = !(cb && cb.checked);
-      setChip(ch, next);
-      clearToast(repToast);
-    });
-    // sync initial
-    const cb = ch.querySelector("input[type=checkbox]");
-    setChip(ch, cb ? cb.checked : true);
-  });
-
-  function getSelectedReportTypes(){
-    const types = [];
-    repTypes.querySelectorAll(".chip").forEach(ch => {
-      const t = ch.dataset.type;
-      const cb = ch.querySelector("input[type=checkbox]");
-      if (cb && cb.checked && t) types.push(t);
-    });
-    return types;
-  }
-
   function todayDateStr(){
     const d = new Date();
     const yyyy = d.getFullYear();
@@ -1585,20 +1668,17 @@ textarea:focus{
     const dd = String(d.getDate()).padStart(2,"0");
     return `${yyyy}-${mm}-${dd}`;
   }
-
   function addDays(dateObj, days){
     const d = new Date(dateObj);
     d.setDate(d.getDate() + days);
     return d;
   }
-
   function dateToStr(d){
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth()+1).padStart(2,"0");
     const dd = String(d.getDate()).padStart(2,"0");
     return `${yyyy}-${mm}-${dd}`;
   }
-
   function applyPreset(days){
     const now = new Date();
     const from = addDays(now, -days);
@@ -1606,7 +1686,6 @@ textarea:focus{
     repTo.value = todayDateStr();
     clearToast(repToast);
   }
-
   repPreset7.addEventListener("click", () => applyPreset(7));
   repPreset30.addEventListener("click", () => applyPreset(30));
   repPresetThisMonth.addEventListener("click", () => {
@@ -1622,48 +1701,27 @@ textarea:focus{
     repTo.value = "";
     repYear.value = "all";
     repRoll.value = "";
-    // turn on all
-    repTypes.querySelectorAll(".chip").forEach(ch => setChip(ch, true));
     setRepMode("time");
     clearToast(repToast);
   });
 
-  function leaveTypeLabel(t){
-    if (t === "single") return "Single Day";
-    if (t === "one") return "One Day";
-    if (t === "extended") return "Extended Leave";
-    return String(t || "").toUpperCase();
-  }
-
-  function isExpired(row){
-    const inVal = getInDT(row);
-    const d = new Date(String(inVal || ""));
-    if (!inVal || isNaN(d)) return false;
-    return new Date() > d;
-  }
-
   function getStudentYear(row){
-    return String(row.student_year ?? row.studentYear ?? row.student?.year ?? row.student?.yearNo ?? row.student?.year_no ?? "").trim();
+    return String(row.student_year ?? row.studentYear ?? "").trim();
   }
 
-  // ===== Reports data fetch + PDF build =====
-  async function fetchApprovedRowsForReport({ fromDate, toDate, year, types, roll }){
-    // Query on APPROVED only + IN datetime range + I am in approver_emails
-    // Then filter by "I approved in chain" + year + types + roll.
+  async function fetchFinalApprovedRowsForReport({ fromDate, toDate, year, roll }){
     const meLower = currentUserEmailLower;
 
     const fromISO = toStartOfDayISO(fromDate);
     const toISO = toEndOfDayISO(toDate);
 
-    // Firestore requires range filters only if values exist.
-    // If no date provided, we still fetch a safe window to avoid pulling everything.
-    // You asked instant download; so date is required.
     if (!fromDate || !toDate) throw new Error("Please select From & To dates (IN datetime).");
 
+    // Firestore: status == approved_final OR approved_dean_final cannot be done in single query without OR.
+    // So fetch my scope in date range, then filter in JS.
     const baseQ = query(
       collection(db, "leave_requests"),
       where("approver_emails", "array-contains", meLower),
-      where("status", "==", "approved"),
       where("in_datetime", ">=", fromISO),
       where("in_datetime", "<=", toISO)
     );
@@ -1671,26 +1729,17 @@ textarea:focus{
     const snap = await getDocs(baseQ);
     let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-    // Must be approved BY ME (stage wise)
-    rows = rows.filter(r => didIApproveThis(r.approver_chain));
+    rows = rows.filter(r => isFinalApprovedStatus(r.status));
+    rows = rows.filter(r => didIAct(r.approver_chain) === "approved");
 
-    // Year filter
     if (year && year !== "all"){
       rows = rows.filter(r => String(getStudentYear(r)) === String(year));
     }
-
-    // Leave type filter (multi)
-    if (Array.isArray(types) && types.length){
-      rows = rows.filter(r => types.includes(String(r.leave_type || "")));
-    }
-
-    // Roll filter (student mode)
     if (roll){
       const rr = normalizeRollno(roll);
-      rows = rows.filter(r => normalizeRollno(r.student_rollno || r.student?.rollno || "") === rr);
+      rows = rows.filter(r => normalizeRollno(r.student_rollno || "") === rr);
     }
 
-    // Sort by IN datetime
     rows.sort((a,b) => String(getInDT(a)||"").localeCompare(String(getInDT(b)||"")));
     return rows;
   }
@@ -1702,69 +1751,70 @@ textarea:focus{
     return `${base}.pdf`;
   }
 
-  function buildPDF({ rows, mode, fromDate, toDate, year, types, roll }){
+  function buildPDF({ rows, mode, fromDate, toDate, year, roll }){
     const { jsPDF } = window.jspdf;
     const docPDF = new jsPDF({ orientation: "portrait", unit: "pt", format: "a4" });
-
     const pageW = docPDF.internal.pageSize.getWidth();
 
-    // Header
     docPDF.setFont("helvetica", "bold");
     docPDF.setFontSize(14);
     docPDF.text("Xavier Institute of Management and Entrepreneurship (XIME)", 40, 42);
 
     docPDF.setFontSize(12);
     docPDF.setTextColor(193, 18, 31);
-    docPDF.text("Leave Management System — Approved Requests Report", 40, 62);
+    docPDF.text("Leave Management System — Final Approved Requests Report", 40, 62);
     docPDF.setTextColor(15, 23, 42);
 
-    // top line
     docPDF.setDrawColor(193, 18, 31);
     docPDF.setLineWidth(2);
     docPDF.line(40, 74, pageW - 40, 74);
 
-    // Meta
     docPDF.setFont("helvetica", "normal");
     docPDF.setFontSize(10);
+
     const genAt = new Date().toLocaleString();
     const who = `${apName.textContent || "Approver"} (${currentUserEmailRaw})`;
-
-    const typeText = (types && types.length) ? types.map(leaveTypeLabel).join(", ") : "All";
     const yearText = (year && year !== "all") ? `Year ${year}` : "All Years";
 
     const lines = [
       `Prepared by: ${who}`,
       `Generated: ${genAt}`,
       `IN datetime range: ${fromDate} to ${toDate}`,
-      `Leave Types: ${typeText}`,
       `Year Filter: ${yearText}`,
-      mode === "student" ? `Student Roll No: ${normalizeRollno(roll || "")}` : `Mode: Timeframe (All Approved by Me)`,
+      mode === "student" ? `Student Roll No: ${normalizeRollno(roll || "")}` : `Mode: Timeframe (All Final Approved by Me)`,
     ];
 
     let y = 92;
-    lines.forEach((t) => {
-      docPDF.text(t, 40, y);
-      y += 14;
+    lines.forEach((t) => { docPDF.text(t, 40, y); y += 14; });
+
+    const lateRows = rows.filter(r => {
+      const late = r?.arrival?.late_minutes ?? r?.arrival?.lateMinutes ?? 0;
+      const verified = !!(r?.arrival?.verified);
+      return verified && (Number(late) > 0);
     });
 
-    // Summary counts
-    const expiredCount = rows.filter(isExpired).length;
     docPDF.setFont("helvetica", "bold");
-    docPDF.text(`Total Records: ${rows.length}    Expired (derived): ${expiredCount}`, 40, y + 6);
+    docPDF.text(`Total Records: ${rows.length}    Late Comers (verified & late): ${lateRows.length}`, 40, y + 6);
     docPDF.setFont("helvetica", "normal");
 
-    // Table
     const tableBody = rows.map((r, idx) => {
-      const studentName = r.student_name || r.student?.name || "";
-      const rollno = normalizeRollno(r.student_rollno || r.student?.rollno || "");
+      const studentName = r.student_name || "";
+      const rollno = normalizeRollno(r.student_rollno || "");
       const yearVal = getStudentYear(r) || "";
-      const hostel = String(r.student_hostel || r.student?.hostel || "").trim();
-      const room = String(r.student_room_no || r.student?.room || r.student?.roomNo || "").trim();
+      const hostel = String(r.student_hostel || "").trim();
+      const room = String(r.student_room_no || "").trim();
       const outVal = getOutDT(r);
       const inVal  = getInDT(r);
-      const leaveT = leaveTypeLabel(r.leave_type);
-      const contact = String(r.contact_no || r.phone || r.contact || "").trim();
-      const reason = String(r.reason || "").trim();
+      const contact = String(r.contact_no || "").trim();
+
+      const actualIn = r?.arrival?.actual_in_datetime || "";
+      const lateMins = r?.arrival?.late_minutes ?? null;
+      const actualInTxt = actualIn ? fmtDT(actualIn) : "—";
+      const lateTxt = (lateMins != null && Number(lateMins) > 0) ? formatLateMinutes(lateMins) : "—";
+
+      const reasonCat = String(r.reason_category || "—").trim();
+      const reasonTxt = String(r.reason_text || r.reason || "").trim();
+      const reason = reasonTxt ? `${reasonCat} — ${reasonTxt}` : reasonCat;
 
       return [
         String(idx + 1),
@@ -1775,7 +1825,8 @@ textarea:focus{
         room || "—",
         fmtDT(outVal),
         fmtDT(inVal),
-        leaveT || "—",
+        actualInTxt,
+        lateTxt,
         contact || "—",
         reason || "—"
       ];
@@ -1784,8 +1835,8 @@ textarea:focus{
     docPDF.autoTable({
       startY: y + 18,
       head: [[
-        "S.No", "Roll No", "Student Name", "Year", "Hostel", "Room",
-        "Out Date & Time", "In Date & Time", "Leave Type", "Contact", "Reason"
+        "S.No","Roll No","Student Name","Year","Hostel","Room",
+        "Out Date & Time","In Date & Time","Actual In Time","Late By","Contact","Reason"
       ]],
       body: tableBody,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 4, overflow: "linebreak" },
@@ -1793,7 +1844,7 @@ textarea:focus{
       alternateRowStyles: { fillColor: [248, 250, 252] },
       margin: { left: 40, right: 40 },
       theme: "striped",
-      didDrawPage: (data) => {
+      didDrawPage: () => {
         const pageCount = docPDF.internal.getNumberOfPages();
         const pageCurrent = docPDF.internal.getCurrentPageInfo().pageNumber;
         docPDF.setFontSize(9);
@@ -1803,23 +1854,42 @@ textarea:focus{
       }
     });
 
-    // Footer / signature block
-    const lastY = docPDF.lastAutoTable.finalY || (y + 40);
-    const signY = Math.min(lastY + 26, docPDF.internal.pageSize.getHeight() - 90);
+    // Late Comers list section
+    if (lateRows.length){
+      docPDF.addPage();
+      docPDF.setFont("helvetica", "bold");
+      docPDF.setFontSize(12);
+      docPDF.setTextColor(193,18,31);
+      docPDF.text("Late Comers List (Verified & Late > 0)", 40, 50);
+      docPDF.setTextColor(15,23,42);
 
-    docPDF.setDrawColor(226, 232, 240);
-    docPDF.setLineWidth(1);
-    docPDF.line(40, signY, pageW - 40, signY);
+      const body2 = lateRows.map((r, i) => {
+        const rollno = normalizeRollno(r.student_rollno || "");
+        const name = r.student_name || "—";
+        const plannedIn = getInDT(r);
+        const actualIn = r?.arrival?.actual_in_datetime || "";
+        const lateMins = r?.arrival?.late_minutes ?? 0;
+        return [
+          String(i+1),
+          rollno,
+          name,
+          fmtDT(plannedIn),
+          actualIn ? fmtDT(actualIn) : "—",
+          formatLateMinutes(lateMins)
+        ];
+      });
 
-    docPDF.setFont("helvetica", "bold");
-    docPDF.setFontSize(10);
-    docPDF.text("Signature", 40, signY + 18);
-
-    docPDF.setFont("helvetica", "normal");
-    docPDF.setFontSize(9);
-    docPDF.setTextColor(100);
-    docPDF.text("Note: This report includes Approved requests. Expired is derived from IN datetime.", 40, signY + 36);
-    docPDF.setTextColor(15, 23, 42);
+      docPDF.autoTable({
+        startY: 70,
+        head: [["S.No","Roll No","Student Name","Planned In Time","Actual In Time","Late By"]],
+        body: body2,
+        styles: { font: "helvetica", fontSize: 9, cellPadding: 5, overflow: "linebreak" },
+        headStyles: { fillColor: [193, 18, 31], textColor: 255, fontStyle: "bold" },
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        margin: { left: 40, right: 40 },
+        theme: "striped"
+      });
+    }
 
     return docPDF;
   }
@@ -1833,46 +1903,37 @@ textarea:focus{
       const fromDate = repFrom.value || "";
       const toDate = repTo.value || "";
       const year = repYear.value || "all";
-      const types = getSelectedReportTypes();
-      const roll = repMode === "student" ? (repRoll.value || "") : "";
+      const roll = (repMode === "student") ? (repRoll.value || "") : "";
 
-      if (!types.length){
-        showToast(repToast, "Select at least one Leave Type.", "bad");
+      if (repMode === "student" && !roll.trim()){
+        showToast(repToast, "Enter Student Roll No for Student-wise report.", "bad");
         return;
-      }
-
-      if (repMode === "student"){
-        if (!roll.trim()){
-          showToast(repToast, "Enter Student Roll No for Student-wise report.", "bad");
-          return;
-        }
       }
 
       showToast(repToast, "Preparing report…", "good");
 
-      const rows = await fetchApprovedRowsForReport({ fromDate, toDate, year, types, roll });
+      const rows = await fetchFinalApprovedRowsForReport({ fromDate, toDate, year, roll });
 
       if (!rows.length){
-        showToast(repToast, "No approved records found for the selected filters.", "bad");
+        showToast(repToast, "No final approved records found for the selected filters.", "bad");
         return;
       }
 
-      const pdf = buildPDF({ rows, mode: repMode, fromDate, toDate, year, types, roll });
+      const pdf = buildPDF({ rows, mode: repMode, fromDate, toDate, year, roll });
       const filename = buildReportFilename({ mode: repMode, fromDate, toDate, roll });
 
       pdf.save(filename);
-
       showToast(repToast, "Downloaded successfully ✅", "good");
 
     }catch(err){
       console.error(err);
-      // If index missing, Firebase throws a message with index link in console.
-      showToast(repToast, err?.message || "Unable to generate report. Check Firestore permissions / indexes.", "bad");
+      showToast(repToast, err?.message || "Unable to generate report. Check Firestore indexes / permissions.", "bad");
     }finally{
       repDownload.disabled = false;
     }
   });
 
+  // ===== Auth boot =====
   onAuthStateChanged(auth, async (u) => {
     if (!u){
       window.location.replace("../index.html");
@@ -1886,21 +1947,17 @@ textarea:focus{
       roleDoc = await loadRoleDoc();
 
       if (roleDoc?.is_active === false){
-        throw new Error("Access denied. Your approver account is inactive.");
+        throw new Error("Access denied. Your account is inactive.");
       }
 
       computeCapabilitiesFromRoleDoc(roleDoc);
-      if (!canBC && !canWarden){
-        throw new Error("Access denied. You are not assigned as Batch Coordinator or Warden.");
+
+      if (!canBC && !canWarden && !canDean){
+        throw new Error("Access denied. You are not assigned as Batch Coordinator / Warden / Dean.");
       }
 
       updateApproverUI();
-      applyRoleBasedVisibility();
-
       showPage("dashboard");
-
-      setLeaveTypeTab(canBC ? "single" : "one");
-      setStatusTab("pending");
 
       // default report dates: this month
       const now = new Date();
@@ -1911,8 +1968,10 @@ textarea:focus{
 
       await refreshCache();
       computeDashboardMetrics();
-      updateStatusCounts();
-      renderRequests();
+      updateHistoryCounts();
+      renderPendingRequests();
+      renderHistory();
+
     }catch(err){
       console.error(err);
       alert(err?.message || "Unable to load approver role/data. Contact Admin.");
