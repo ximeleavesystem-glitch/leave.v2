@@ -1325,7 +1325,7 @@ if (hasActiveSameGroup){
 
        
         const payload = {
-  student_uid: auth.currentUser?.uid || "",   // ✅ fixed
+  student_uid: currentUser?.uid || "",  // ✅ fixed
   student_rollno: studentRoll,
   student_name: student.name || "",
   student_email: studentEmailLower,
@@ -1392,6 +1392,10 @@ if (hasActiveSameGroup){
   created_at: serverTimestamp(),
   updated_at: serverTimestamp()
 };
+if (!currentUser?.uid){
+  showToast(toastLeave, "Auth not ready. Please refresh and try again.", "bad");
+  return;
+}
 
         await addDoc(collection(db, "leave_requests"), payload);
 
@@ -1449,6 +1453,7 @@ if (hasActiveSameGroup){
   </script>
 </body>
 </html>
+
 
 
 
