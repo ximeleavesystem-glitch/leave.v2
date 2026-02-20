@@ -199,7 +199,7 @@ select:focus, input:focus{
 .applyBtn:hover{ transform: translateY(-1px); box-shadow: 0 16px 34px rgba(193,18,31,.22); }
 .applyBtn:disabled{ opacity:.6; cursor:not-allowed; transform:none; box-shadow:none; }
 
-.metrics{ display:grid; grid-template-columns: repeat(4, 1fr); gap:10px; }
+.metrics{ display:grid; grid-template-columns: repeat(5, 1fr); gap:10px; }
 @media(max-width: 1050px){ .metrics{ grid-template-columns: repeat(2, 1fr); } }
 .metric{
   border:1px solid var(--line);
@@ -503,6 +503,7 @@ textarea:focus{
             <div class="metric"><div class="k">PENDING FOR ME</div><div class="v" id="mPending">0</div></div>
             <div class="metric"><div class="k">APPROVED BY ME</div><div class="v" id="mApproved">0</div></div>
             <div class="metric"><div class="k">REJECTED BY ME</div><div class="v" id="mRejected">0</div></div>
+            <div class="metric"><div class="k">WEEKEND LEAVES (IN SCOPE)</div><div class="v" id="mWeekend">0</div></div>
           </div>
         </div>
       </section>
@@ -593,10 +594,88 @@ textarea:focus{
 
   <!-- HISTORY -->
   <section id="pageHistory" class="hidden">
+
+    <!-- Dean-style filters (History + Intimation) -->
+    <div class="panel" style="margin-bottom:12px;">
+      <div class="panelHead">
+        <h3 class="panelTitle">Filters</h3>
+        <div class="smallBtns">
+          <button class="btnGhost" id="hClearFilters" type="button">Clear</button>
+        </div>
+      </div>
+      <div class="panelBody">
+        <div class="filterBar" style="grid-template-columns: 1fr 1fr 1fr; align-items:end;">
+          <div class="filterBox">
+            <label>From Date (Out)</label>
+            <input id="hFrom" type="date">
+          </div>
+          <div class="filterBox">
+            <label>To Date (Out)</label>
+            <input id="hTo" type="date">
+          </div>
+          <div class="filterBox">
+            <label>Roll No</label>
+            <input id="hRoll" type="text" placeholder="e.g., C08080">
+          </div>
+        </div>
+
+        <div class="filterBar" style="grid-template-columns: 1fr 1fr 1fr; margin-top:10px;">
+          <div class="filterBox">
+            <label>Year</label>
+            <select id="hYear">
+              <option value="all">All</option>
+              <option value="1">Year 1</option>
+              <option value="2">Year 2</option>
+            </select>
+          </div>
+          <div class="filterBox">
+            <label>Hostel</label>
+            <select id="hHostel">
+              <option value="all">All</option>
+              <option value="boys">Boys</option>
+              <option value="girls">Girls</option>
+              <option value="guest_house">Guest House</option>
+            </select>
+          </div>
+          <div class="filterBox">
+            <label>Reason Category</label>
+            <select id="hReason">
+              <option value="all">All</option>
+              <option value="weekend_leave">Weekend Leave</option>
+              <option value="academic">Academic</option>
+              <option value="emergency">Emergency</option>
+              <option value="vacation">Vacation</option>
+              <option value="other">Other</option>
+              <option value="personal">Personal (legacy)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="filterBar" style="grid-template-columns: 1fr 1fr 140px; margin-top:10px;">
+          <div class="filterBox">
+            <label>Late Students Only</label>
+            <select id="hLateOnly">
+              <option value="no" selected>No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+          <div class="filterBox">
+            <label>Not Verified Only</label>
+            <select id="hNotVerifiedOnly">
+              <option value="no" selected>No</option>
+              <option value="yes">Yes</option>
+            </select>
+          </div>
+          <button class="applyBtn" id="hApplyFilters" type="button">Apply</button>
+        </div>
+      </div>
+    </div>
+
     <div class="statusTabs">
       <div class="statusTab active" id="hApproved">Approved <span class="count" id="hcApproved">0</span></div>
       <div class="statusTab" id="hRejected">Rejected <span class="count" id="hcRejected">0</span></div>
       <div class="statusTab" id="hEscalated">Escalated to Dean <span class="count" id="hcEscalated">0</span></div>
+      <div class="statusTab hidden" id="hIntimation">Intimation (Warden Approved) <span class="count" id="hcIntimation">0</span></div>
     </div>
 
     <div id="historyContainer"></div>
@@ -613,7 +692,7 @@ textarea:focus{
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
   import {
     getFirestore, doc, getDoc, collection, getDocs, query, where, updateDoc,
-    serverTimestamp, setDoc
+    serverTimestamp, setDoc, Timestamp
   } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
   window.addEventListener("pageshow", (e) => {
@@ -663,6 +742,7 @@ textarea:focus{
   const mPending = document.getElementById("mPending");
   const mApproved = document.getElementById("mApproved");
   const mRejected = document.getElementById("mRejected");
+  const mWeekend = document.getElementById("mWeekend");
 
   // Requests filter
   const rFrom = document.getElementById("rFrom");
@@ -676,9 +756,23 @@ textarea:focus{
   const hApproved = document.getElementById("hApproved");
   const hRejected = document.getElementById("hRejected");
   const hEscalated = document.getElementById("hEscalated");
+  const hIntimation = document.getElementById("hIntimation");
   const hcApproved = document.getElementById("hcApproved");
   const hcRejected = document.getElementById("hcRejected");
   const hcEscalated = document.getElementById("hcEscalated");
+  const hcIntimation = document.getElementById("hcIntimation");
+
+  // History filters
+  const hFrom = document.getElementById("hFrom");
+  const hTo = document.getElementById("hTo");
+  const hRoll = document.getElementById("hRoll");
+  const hYear = document.getElementById("hYear");
+  const hHostel = document.getElementById("hHostel");
+  const hReason = document.getElementById("hReason");
+  const hLateOnly = document.getElementById("hLateOnly");
+  const hNotVerifiedOnly = document.getElementById("hNotVerifiedOnly");
+  const hApplyFilters = document.getElementById("hApplyFilters");
+  const hClearFilters = document.getElementById("hClearFilters");
 
   // Reports DOM
   const repModeTime = document.getElementById("repModeTime");
@@ -706,15 +800,17 @@ textarea:focus{
   let canBC = false;
   let canWarden = false;
   let canDean = false;
+  let bcYears = []; // from role doc
 
   let dashFrom = "";
   let dashTo = "";
   let reqFrom = "";
   let reqTo = "";
 
-  let activeHistoryTab = "approved"; // approved | rejected | escalated
+  let activeHistoryTab = "approved"; // approved | rejected | escalated | intimation
 
   let cacheAllForApprover = []; // pending + acted by me + escalated
+  let cacheIntimationForBC = []; // warden-approved final requests for my bc year(s)
   const rosterPhotoCache = new Map();
   const IMG_PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
@@ -747,8 +843,22 @@ textarea:focus{
     }
   }
 
-  function toStartOfDayISO(dateStr){ return dateStr ? `${dateStr}T00:00` : ""; }
-  function toEndOfDayISO(dateStr){ return dateStr ? `${dateStr}T23:59` : ""; }
+  function parseDateStart(dateStr){
+    if (!dateStr) return null;
+    const d = new Date(`${dateStr}T00:00:00`);
+    return isNaN(d) ? null : d;
+  }
+  function parseDateEnd(dateStr){
+    if (!dateStr) return null;
+    const d = new Date(`${dateStr}T23:59:59.999`);
+    return isNaN(d) ? null : d;
+  }
+  function dateRangeToTimestamps(fromDate, toDate){
+    const s = parseDateStart(fromDate);
+    const e = parseDateEnd(toDate);
+    if (!s || !e) return { start:null, end:null };
+    return { start: Timestamp.fromDate(s), end: Timestamp.fromDate(e) };
+  }
 
   function getOutDT(row){ return row.out_datetime || row.outDT || row.outDateTime || ""; }
   function getInDT(row){ return row.in_datetime || row.inDT || row.inDateTime || ""; }
@@ -761,37 +871,23 @@ textarea:focus{
   }
 
   function inDateRangeOutDT(row, fromDate, toDate){
-    const outDT = getOutDT(row);
-    if (!outDT) return false;
-    const out = String(outDT);
-    if (fromDate){
-      const fromISO = toStartOfDayISO(fromDate);
-      if (out < fromISO) return false;
-    }
-    if (toDate){
-      const toISO = toEndOfDayISO(toDate);
-      if (out > toISO) return false;
-    }
-    return true;
-  }
+    const outVal = getOutDT(row);
+    if (!outVal) return false;
 
-  function inDateRangeInDT(row, fromDate, toDate){
-    const inDT = getInDT(row);
-    if (!inDT) return false;
-    const inn = String(inDT);
-    if (fromDate){
-      const fromISO = toStartOfDayISO(fromDate);
-      if (inn < fromISO) return false;
-    }
-    if (toDate){
-      const toISO = toEndOfDayISO(toDate);
-      if (inn > toISO) return false;
-    }
+    let outDate = null;
+    if (typeof outVal?.toDate === "function") outDate = outVal.toDate();
+    else outDate = new Date(outVal);
+
+    if (!outDate || isNaN(outDate)) return false;
+
+    const s = parseDateStart(fromDate);
+    const e = parseDateEnd(toDate);
+    if (s && outDate < s) return false;
+    if (e && outDate > e) return false;
     return true;
   }
 
   function fmtDT(val){
-    // supports Timestamp / ISO string
     let dt = null;
     if (!val) return "-";
     if (typeof val?.toDate === "function") dt = val.toDate();
@@ -826,48 +922,18 @@ textarea:focus{
     return `${h}h ${r}m`;
   }
 
-  function computeArrivalStatusLine(row){
-    const outVal = getOutDT(row);
-    const out = new Date(String(outVal || ""));
-    if (!outVal || isNaN(out)) return "";
-
-    const now = new Date();
-    if (now < out) return ""; // only after OUT time crossed
-
-    const arrival = row.arrival || {};
-    const verified = !!arrival.verified;
-    if (!verified){
-      return "⚠️ Student not yet reached back";
-    }
-
-    const verifiedAt = arrival.verified_at || arrival.verifiedAt || arrival.verified_time || "";
-    const actual = arrival.actual_in_datetime || arrival.actualInDatetime || "";
-    const lateMinutes = arrival.late_minutes ?? arrival.lateMinutes;
-
-    const lateTxt = (lateMinutes != null) ? `Late by ${formatLateMinutes(lateMinutes)}` : "Late by —";
-    const atTxt = verifiedAt ? fmtDT(verifiedAt) : (actual ? fmtDT(actual) : "—");
-    return `✅ Reached • Verified at ${atTxt} • ${lateTxt}`;
+  function isFinalApprovedStatus(st){
+    const s = String(st || "").toLowerCase();
+    return s === "approved_final" || s === "approved_dean_final";
   }
 
-  function isWeekendBlock(outVal){
-    const d = new Date(String(outVal || ""));
-    if (isNaN(d)) return false;
-    const dow = d.getDay(); // 0 Sun .. 6 Sat
-    // Weekend = Fri + Sat only (as you defined)
-    return dow === 5 || dow === 6;
-  }
-
-  function ordinal(n){
-    const s=["th","st","nd","rd"], v=n%100;
-    return n + (s[(v-20)%10]||s[v]||s[0]);
-  }
-
-  function monthKeyFromOut(outVal){
-    const d = new Date(String(outVal||""));
-    if (isNaN(d)) return "";
-    const y = d.getFullYear();
-    const m = String(d.getMonth()+1).padStart(2,"0");
-    return `${y}-${m}`;
+  function didIAct(chain){
+    const entry = chainEntryForMe(chain);
+    if (!entry) return null;
+    const st = String(entry.action || entry.status || "").toLowerCase();
+    if (st === "approved") return "approved";
+    if (st === "rejected") return "rejected";
+    return null;
   }
 
   function chainEntryForMe(chain){
@@ -880,25 +946,6 @@ textarea:focus{
     }) || null;
   }
 
-  function didIAct(chain){
-    const entry = chainEntryForMe(chain);
-    if (!entry) return null;
-    const st = String(entry.action || entry.status || "").toLowerCase();
-    if (st === "approved") return "approved";
-    if (st === "rejected") return "rejected";
-    return null;
-  }
-
-  function isFinalApprovedStatus(st){
-    const s = String(st || "").toLowerCase();
-    return s === "approved_final" || s === "approved_dean_final";
-  }
-
-  function isFinalRejectedStatus(st){
-    const s = String(st || "").toLowerCase();
-    return s === "rejected_l1" || s === "rejected_dean";
-  }
-
   function isPendingForMe(row){
     const holder = getCurrentHolderEmail(row);
     const holderOk = holder === currentUserEmailRaw || holder.toLowerCase() === currentUserEmailLower;
@@ -906,8 +953,69 @@ textarea:focus{
     return holderOk && (st === "pending_l1" || st === "pending_dean");
   }
 
+  function getStudentYear(row){
+    return String(row.student_year ?? row.studentYear ?? "").trim();
+  }
+  function getHostel(row){
+    return String(row.student_hostel || "").trim().toLowerCase();
+  }
+  function getReasonCat(row){
+    return String(row.reason_category || row.reasonCategory || "").trim().toLowerCase();
+  }
+
+  function computeArrivalStatusLine(row){
+    // Always show meaningful status on History cards.
+    const arrival = row.arrival || {};
+    const verified = !!arrival.verified;
+    const lateMinutes = arrival.late_minutes ?? arrival.lateMinutes;
+
+    // If final approved but not verified
+    if (isFinalApprovedStatus(row.status)){
+      if (!verified){
+        return "⚠️ Arrival: NOT VERIFIED (Student has not entered / not verified)";
+      }
+      const verifiedAt = arrival.verified_at || arrival.verifiedAt || arrival.actual_in_time || arrival.actualInTime || null;
+      const atTxt = verifiedAt ? fmtDT(verifiedAt) : "—";
+      const lateTxt = (lateMinutes != null && Number(lateMinutes) > 0)
+        ? `Late by ${formatLateMinutes(lateMinutes)}`
+        : "On time";
+      return `✅ Arrival: VERIFIED • ${lateTxt} • at ${atTxt}`;
+    }
+
+    // For non-final statuses (pending/rejected), we keep it minimal
+    if (verified){
+      const lateTxt = (lateMinutes != null && Number(lateMinutes) > 0)
+        ? `Late by ${formatLateMinutes(lateMinutes)}`
+        : "On time";
+      return `✅ Arrival: VERIFIED • ${lateTxt}`;
+    }
+    return ""; // don't clutter pending/rejected
+  }
+
+  function isLateRow(row){
+    const arrival = row.arrival || {};
+    const verified = !!arrival.verified;
+    const lateMinutes = arrival.late_minutes ?? arrival.lateMinutes ?? 0;
+    return verified && Number(lateMinutes) > 0;
+  }
+
+  function isNotVerifiedRow(row){
+    const arrival = row.arrival || {};
+    const verified = !!arrival.verified;
+    return !verified;
+  }
+
+  function isWeekendReason(row){
+    const rc = getReasonCat(row);
+    // new student UI uses weekend_leave
+    if (rc === "weekend_leave") return true;
+    // legacy safety
+    if (rc === "weekend" || rc === "weekend leave") return true;
+    return false;
+  }
+
   function computeCapabilitiesFromRoleDoc(d){
-    const bcYears = Array.isArray(d?.bc_years) ? d.bc_years.map(x => String(x)) : [];
+    bcYears = Array.isArray(d?.bc_years) ? d.bc_years.map(x => String(x)) : [];
     const wardenHostels = Array.isArray(d?.warden_hostels) ? d.warden_hostels.map(x => String(x).toLowerCase()) : [];
     canBC = bcYears.some(y => y === "1" || y === "2");
     canWarden = wardenHostels.length > 0;
@@ -951,6 +1059,13 @@ textarea:focus{
       apBC.textContent = batches;
     } else {
       lineBC.style.display = "none";
+    }
+
+    // Intimation tab is only for BC
+    if (canBC){
+      hIntimation.classList.remove("hidden");
+    } else {
+      hIntimation.classList.add("hidden");
     }
   }
 
@@ -996,7 +1111,7 @@ textarea:focus{
     }
   }
 
-  // ===== Photo helpers (same as your old) =====
+  // ===== Photo helpers =====
   function extractDriveId(url){
     const u = String(url || "").trim();
     if (!u) return "";
@@ -1089,112 +1204,92 @@ textarea:focus{
     img.src = primary;
   }
 
-  // ===== Cache refresh (new statuses) =====
+  // ===== Cache refresh =====
   async function refreshCache(){
-  const meLower = currentUserEmailLower;
-  const meRaw = currentUserEmailRaw;
-
-  // ✅ Pending assigned to me (query using current_holder_email)
-  const qHoldLower = query(
-    collection(db, "leave_requests"),
-    where("current_holder_email", "==", meLower)
-  );
-  const qHoldRaw = query(
-    collection(db, "leave_requests"),
-    where("current_holder_email", "==", meRaw)
-  );
-
-  // Pull assigned docs then filter pending in JS (avoids Firestore "in" index problems)
-  const assignedAll = await tryGetDocs(qHoldLower, qHoldRaw);
-  const pendingRows = assignedAll.filter(r => {
-    const st = String(r.status || "").toLowerCase();
-    return st === "pending_l1" || st === "pending_dean";
-  });
-
-  // ✅ All my-involved (history)
-  const qMineLower = query(
-    collection(db, "leave_requests"),
-    where("approver_emails", "array-contains", meLower)
-  );
-  const qMineRaw = query(
-    collection(db, "leave_requests"),
-    where("approver_emails", "array-contains", meRaw)
-  );
-
-  let mineAll = [];
-  try { mineAll = await tryGetDocs(qMineLower, qMineRaw); }
-  catch(e){ mineAll = []; }
-
-  const actedOrEscalated = mineAll.filter(r => {
-    const acted = didIAct(r.approver_chain);
-    if (acted) return true;
-    if (r?.escalation?.requested) return true;
-    return false;
-  });
-
-  const map = new Map();
-  [...pendingRows, ...actedOrEscalated].forEach(r => map.set(r.id, r));
-  cacheAllForApprover = [...map.values()];
-}
-
-  function computeDashboardMetrics(){
     const meLower = currentUserEmailLower;
     const meRaw = currentUserEmailRaw;
 
-    const rows = cacheAllForApprover.filter(r => {
-      if (!inDateRangeOutDT(r, dashFrom, dashTo)) return false;
-      return true;
+    // Pending assigned to me
+    const qHoldLower = query(collection(db, "leave_requests"), where("current_holder_email", "==", meLower));
+    const qHoldRaw   = query(collection(db, "leave_requests"), where("current_holder_email", "==", meRaw));
+
+    const assignedAll = await tryGetDocs(qHoldLower, qHoldRaw);
+    const pendingRows = assignedAll.filter(r => {
+      const st = String(r.status || "").toLowerCase();
+      return st === "pending_l1" || st === "pending_dean";
     });
 
+    // History for me (acted or escalated)
+    const qMineLower = query(collection(db, "leave_requests"), where("approver_emails", "array-contains", meLower));
+    const qMineRaw   = query(collection(db, "leave_requests"), where("approver_emails", "array-contains", meRaw));
+
+    let mineAll = [];
+    try { mineAll = await tryGetDocs(qMineLower, qMineRaw); }
+    catch(e){ mineAll = []; }
+
+    const actedOrEscalated = mineAll.filter(r => {
+      const acted = didIAct(r.approver_chain);
+      if (acted) return true;
+      if (r?.escalation?.requested) return true;
+      return false;
+    });
+
+    const map = new Map();
+    [...pendingRows, ...actedOrEscalated].forEach(r => map.set(r.id, r));
+    cacheAllForApprover = [...map.values()];
+
+    // BC Intimation cache: warden-approved final requests in BC year scope
+    cacheIntimationForBC = [];
+    if (canBC && bcYears.length){
+      const years = bcYears.filter(y => y === "1" || y === "2");
+
+      // We can’t do "routing.l1_role == warden" + year IN + status IN in a single query reliably without indexes,
+      // so we do a safer approach: query final statuses and filter in JS.
+      try{
+        const qFinal = query(
+          collection(db, "leave_requests"),
+          where("status", "in", ["approved_final","approved_dean_final"])
+        );
+        const snap = await getDocs(qFinal);
+        let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+        rows = rows.filter(r => String(r?.routing?.l1_role || "").toLowerCase() === "warden");
+        rows = rows.filter(r => years.includes(String(getStudentYear(r))));
+        // optional: date range from dashboard filter (out datetime)
+        rows = rows.filter(r => inDateRangeOutDT(r, dashFrom, dashTo));
+
+        // newest first
+        rows.sort((a,b) => {
+          const aa = getOutDT(a); const bb = getOutDT(b);
+          const ad = typeof aa?.toDate === "function" ? aa.toDate() : new Date(aa);
+          const bd = typeof bb?.toDate === "function" ? bb.toDate() : new Date(bb);
+          return (bd?.getTime?.()||0) - (ad?.getTime?.()||0);
+        });
+
+        cacheIntimationForBC = rows;
+      }catch(e){
+        // If "in" query requires index or blocked by rules, we fallback to a broader fetch via year scope if possible.
+        // (Keeping it silent — UI will still work from primary cache if any.)
+        cacheIntimationForBC = [];
+      }
+    }
+  }
+
+  function computeDashboardMetrics(){
+    const rows = cacheAllForApprover.filter(r => inDateRangeOutDT(r, dashFrom, dashTo));
+
     const total = rows.length;
-
     const pending = rows.filter(r => isPendingForMe(r)).length;
+    const approved = rows.filter(r => didIAct(r.approver_chain) === "approved").length;
+    const rejected = rows.filter(r => didIAct(r.approver_chain) === "rejected").length;
 
-    const approved = rows.filter(r => {
-      const acted = didIAct(r.approver_chain);
-      return acted === "approved";
-    }).length;
-
-    const rejected = rows.filter(r => {
-      const acted = didIAct(r.approver_chain);
-      return acted === "rejected";
-    }).length;
+    const weekend = rows.filter(r => isWeekendReason(r)).length;
 
     mTotal.textContent = String(total);
     mPending.textContent = String(pending);
     mApproved.textContent = String(approved);
     mRejected.textContent = String(rejected);
-  }
-
-  // ===== Weekend Approved Counter (Fri+Sat, final approved only) =====
-  function buildWeekendApprovedCounters(){
-    // Map: monthKey -> roll -> countIndex
-    const counters = new Map(); // monthKey -> Map(roll -> n)
-    const indexForRequest = new Map(); // requestId -> index
-
-    // Consider only final approved
-    const rows = cacheAllForApprover
-      .filter(r => isFinalApprovedStatus(r.status))
-      .filter(r => isWeekendBlock(getOutDT(r)));
-
-    // sort by out_datetime asc so 1st approved weekend is stable
-    rows.sort((a,b) => String(getOutDT(a)||"").localeCompare(String(getOutDT(b)||"")));
-
-    for (const r of rows){
-      const roll = normalizeRollno(r.student_rollno || "");
-      const mk = r.month_key || monthKeyFromOut(getOutDT(r)) || "";
-      if (!roll || !mk) continue;
-
-      if (!counters.has(mk)) counters.set(mk, new Map());
-      const mm = counters.get(mk);
-
-      const prev = mm.get(roll) || 0;
-      const next = prev + 1;
-      mm.set(roll, next);
-      indexForRequest.set(r.id, next);
-    }
-
-    return indexForRequest;
+    mWeekend.textContent = String(weekend);
   }
 
   // ===== Render Pending Requests =====
@@ -1203,8 +1298,12 @@ textarea:focus{
       .filter(r => isPendingForMe(r))
       .filter(r => inDateRangeOutDT(r, reqFrom, reqTo));
 
-    // sort newest out first
-    rows.sort((a,b) => String(getOutDT(b)||"").localeCompare(String(getOutDT(a)||"")));
+    rows.sort((a,b) => {
+      const aa = getOutDT(a); const bb = getOutDT(b);
+      const ad = typeof aa?.toDate === "function" ? aa.toDate() : new Date(aa);
+      const bd = typeof bb?.toDate === "function" ? bb.toDate() : new Date(bb);
+      return (bd?.getTime?.()||0) - (ad?.getTime?.()||0);
+    });
 
     requestsContainer.innerHTML = "";
 
@@ -1217,8 +1316,6 @@ textarea:focus{
       requestsContainer.appendChild(empty);
       return;
     }
-
-    const weekendIndex = buildWeekendApprovedCounters();
 
     rows.forEach(r => {
       const st = String(r.status || "").toLowerCase();
@@ -1237,14 +1334,11 @@ textarea:focus{
 
       const arrivalLine = computeArrivalStatusLine(r);
 
-      // Escalation checkbox only for L1 (BC/Warden) and only if current stage is L1
       const holderRole = getCurrentHolderRole(r).toLowerCase();
       const canEscalate = (holderRole === "batch_coordinator" || holderRole === "warden") && !!(r.routing && r.routing.dean_email);
 
       const remarkId = `remark_${r.id}`;
       const escId = `esc_${r.id}`;
-
-      const weekendTag = isWeekendBlock(outVal) ? "WEEKEND BLOCK (Fri/Sat)" : "WEEKDAY";
 
       const card = document.createElement("section");
       card.className = "requestCard";
@@ -1255,7 +1349,7 @@ textarea:focus{
             <div class="studentAvatar">${initials(studentName)}</div>
             <div class="studentText">
               <div class="studentName">${studentName}</div>
-              <div class="studentMeta">${(roll||"—")} • Room ${room} • ${weekendTag}</div>
+              <div class="studentMeta">${(roll||"—")} • Room ${room}</div>
               ${arrivalLine ? `<div class="reqCountLine">${arrivalLine}</div>` : ``}
             </div>
           </div>
@@ -1295,35 +1389,85 @@ textarea:focus{
     });
   }
 
+  // ===== History filters apply =====
+  function getHistoryFilters(){
+    return {
+      from: (hFrom.value || "").trim(),
+      to: (hTo.value || "").trim(),
+      roll: normalizeRollno(hRoll.value || ""),
+      year: String(hYear.value || "all"),
+      hostel: String(hHostel.value || "all").toLowerCase(),
+      reason: String(hReason.value || "all").toLowerCase(),
+      lateOnly: String(hLateOnly.value || "no") === "yes",
+      notVerifiedOnly: String(hNotVerifiedOnly.value || "no") === "yes"
+    };
+  }
+
+  function applyHistoryFilters(rows){
+    const f = getHistoryFilters();
+
+    rows = rows.filter(r => inDateRangeOutDT(r, f.from, f.to));
+
+    if (f.roll){
+      rows = rows.filter(r => normalizeRollno(r.student_rollno || "") === f.roll);
+    }
+    if (f.year !== "all"){
+      rows = rows.filter(r => String(getStudentYear(r)) === String(f.year));
+    }
+    if (f.hostel !== "all"){
+      rows = rows.filter(r => getHostel(r) === f.hostel);
+    }
+    if (f.reason !== "all"){
+      rows = rows.filter(r => getReasonCat(r) === f.reason);
+    }
+    if (f.lateOnly){
+      rows = rows.filter(r => isLateRow(r));
+    }
+    if (f.notVerifiedOnly){
+      rows = rows.filter(r => isNotVerifiedRow(r) && isFinalApprovedStatus(r.status));
+    }
+    return rows;
+  }
+
   // ===== History Render =====
   function setHistoryTab(which){
     activeHistoryTab = which;
-    [hApproved, hRejected, hEscalated].forEach(x => x.classList.remove("active"));
+    [hApproved, hRejected, hEscalated, hIntimation].forEach(x => x.classList.remove("active"));
     if (which === "approved") hApproved.classList.add("active");
     if (which === "rejected") hRejected.classList.add("active");
     if (which === "escalated") hEscalated.classList.add("active");
+    if (which === "intimation") hIntimation.classList.add("active");
     renderHistory();
   }
 
   function renderHistory(){
-    let rows = cacheAllForApprover.slice();
+    let rows = [];
 
-    if (activeHistoryTab === "approved"){
-      rows = rows.filter(r => didIAct(r.approver_chain) === "approved");
-    } else if (activeHistoryTab === "rejected"){
-      rows = rows.filter(r => didIAct(r.approver_chain) === "rejected");
+    if (activeHistoryTab === "intimation"){
+      rows = cacheIntimationForBC.slice();
     } else {
-      // escalated: show pending + dean-approved + dean-rejected
-      rows = rows.filter(r => !!(r?.escalation?.requested));
+      rows = cacheAllForApprover.slice();
+      if (activeHistoryTab === "approved"){
+        rows = rows.filter(r => didIAct(r.approver_chain) === "approved");
+      } else if (activeHistoryTab === "rejected"){
+        rows = rows.filter(r => didIAct(r.approver_chain) === "rejected");
+      } else {
+        rows = rows.filter(r => !!(r?.escalation?.requested));
+      }
     }
 
-    // Sort newest out first
-    rows.sort((a,b) => String(getOutDT(b)||"").localeCompare(String(getOutDT(a)||"")));
+    // Apply dean-style filters to BOTH history & intimation
+    rows = applyHistoryFilters(rows);
 
-    // Counts
-    hcApproved.textContent = String(cacheAllForApprover.filter(r => didIAct(r.approver_chain) === "approved").length);
-    hcRejected.textContent = String(cacheAllForApprover.filter(r => didIAct(r.approver_chain) === "rejected").length);
-    hcEscalated.textContent = String(cacheAllForApprover.filter(r => !!(r?.escalation?.requested)).length);
+    // Sort newest out first
+    rows.sort((a,b) => {
+      const aa = getOutDT(a); const bb = getOutDT(b);
+      const ad = typeof aa?.toDate === "function" ? aa.toDate() : new Date(aa);
+      const bd = typeof bb?.toDate === "function" ? bb.toDate() : new Date(bb);
+      return (bd?.getTime?.()||0) - (ad?.getTime?.()||0);
+    });
+
+    updateHistoryCounts();
 
     historyContainer.innerHTML = "";
 
@@ -1336,8 +1480,6 @@ textarea:focus{
       historyContainer.appendChild(empty);
       return;
     }
-
-    const weekendIndex = buildWeekendApprovedCounters();
 
     for (const r of rows){
       const st = String(r.status || "").toLowerCase();
@@ -1359,13 +1501,6 @@ textarea:focus{
 
       const arrivalLine = computeArrivalStatusLine(r);
 
-      // weekend approved count line (only meaningful for weekend leaves)
-      let reqCountHTML = "";
-      if (isWeekendBlock(outVal) && isFinalApprovedStatus(r.status)){
-        const idx = weekendIndex.get(r.id) || 1;
-        reqCountHTML = `<div class="reqCountLine">${ordinal(idx)} weekend request of the month</div>`;
-      }
-
       const card = document.createElement("section");
       card.className = "requestCard";
       card.innerHTML = `
@@ -1376,7 +1511,6 @@ textarea:focus{
             <div class="studentText">
               <div class="studentName">${studentName}</div>
               <div class="studentMeta">${(roll||"—")} • Room ${room}</div>
-              ${reqCountHTML}
               ${arrivalLine ? `<div class="reqCountLine">${arrivalLine}</div>` : ``}
             </div>
           </div>
@@ -1392,6 +1526,13 @@ textarea:focus{
       historyContainer.appendChild(card);
       hydrateStudentPhoto(card, roll, studentName, r);
     }
+  }
+
+  function updateHistoryCounts(){
+    hcApproved.textContent = String(cacheAllForApprover.filter(r => didIAct(r.approver_chain) === "approved").length);
+    hcRejected.textContent = String(cacheAllForApprover.filter(r => didIAct(r.approver_chain) === "rejected").length);
+    hcEscalated.textContent = String(cacheAllForApprover.filter(r => !!(r?.escalation?.requested)).length);
+    hcIntimation.textContent = String(cacheIntimationForBC.length);
   }
 
   // ===== Gatepass Public =====
@@ -1420,7 +1561,7 @@ textarea:focus{
     await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
   }
 
-  // ===== Approve / Reject (new routing policy) =====
+  // ===== Approve / Reject (your existing logic) =====
   function ensureDeanStage(chain, deanEmail){
     const arr = Array.isArray(chain) ? [...chain] : [];
     const exists = arr.some(x => String(x?.role || "").toLowerCase() === "dean");
@@ -1447,11 +1588,10 @@ textarea:focus{
       const e = String(x?.email || "").trim();
       const ok = e === meRaw || e.toLowerCase() === meLower;
       const st = String(x?.action || x?.status || "").toLowerCase();
-      return ok && (st === "pending" || st === ""); // pending stage for me
+      return ok && (st === "pending" || st === "");
     });
 
     if (idx === -1){
-      // fallback: any entry for me
       idx = arr.findIndex(x => {
         const e = String(x?.email || "").trim();
         return e === meRaw || e.toLowerCase() === meLower;
@@ -1478,7 +1618,6 @@ textarea:focus{
   async function handleApprove(requestId){
     const r = cacheAllForApprover.find(x => x.id === requestId);
     if (!r) return;
-
     if (!isPendingForMe(r)) return;
 
     const st = String(r.status || "").toLowerCase();
@@ -1497,26 +1636,19 @@ textarea:focus{
 
     let finalApproved = false;
 
-    // If Dean is approving (pending_dean) => final approved by dean
     if (holderRole === "dean" || st === "pending_dean"){
       updates.status = "approved_dean_final";
       updates.current = { holder_email: null, holder_role: "", stage: "" };
       updates.current_holder_email = null;
 
-      updates.escalation = {
-        ...(r.escalation || {}),
-        dean_action: "approved"
-      };
-
+      updates.escalation = { ...(r.escalation || {}), dean_action: "approved" };
       finalApproved = true;
     } else {
-      // L1 approving
       const deanEmail = r?.routing?.dean_email || "";
       const escEl = document.getElementById(`esc_${requestId}`);
       const wantEsc = !!(escEl && escEl.checked);
 
       if (wantEsc && deanEmail){
-        // escalate to dean
         chain = ensureDeanStage(chain, deanEmail);
         updates.approver_chain = chain;
         updates.status = "pending_dean";
@@ -1531,17 +1663,11 @@ textarea:focus{
           reason: ""
         };
       } else {
-        // final approved at L1
         updates.status = "approved_final";
         updates.current = { holder_email: null, holder_role: "", stage: "" };
         updates.current_holder_email = null;
 
-        updates.escalation = {
-          ...(r.escalation || {}),
-          requested: false,
-          dean_action: "not_required"
-        };
-
+        updates.escalation = { ...(r.escalation || {}), requested: false, dean_action: "not_required" };
         finalApproved = true;
       }
     }
@@ -1557,7 +1683,6 @@ textarea:focus{
       computeDashboardMetrics();
       renderPendingRequests();
       renderHistory();
-      updateHistoryCounts();
     }catch(e){
       console.error(e);
       alert("Unable to approve. Check Firestore rules / indexes.");
@@ -1567,7 +1692,6 @@ textarea:focus{
   async function handleReject(requestId){
     const r = cacheAllForApprover.find(x => x.id === requestId);
     if (!r) return;
-
     if (!isPendingForMe(r)) return;
 
     const st = String(r.status || "").toLowerCase();
@@ -1588,17 +1712,10 @@ textarea:focus{
 
     if (holderRole === "dean" || st === "pending_dean"){
       updates.status = "rejected_dean";
-      updates.escalation = {
-        ...(r.escalation || {}),
-        dean_action: "rejected"
-      };
+      updates.escalation = { ...(r.escalation || {}), dean_action: "rejected" };
     } else {
       updates.status = "rejected_l1";
-      // if it was escalated before reject (rare), still show in escalated history
-      updates.escalation = {
-        ...(r.escalation || {}),
-        dean_action: r?.escalation?.requested ? "pending" : "not_required"
-      };
+      updates.escalation = { ...(r.escalation || {}), dean_action: r?.escalation?.requested ? "pending" : "not_required" };
     }
 
     try{
@@ -1608,18 +1725,10 @@ textarea:focus{
       computeDashboardMetrics();
       renderPendingRequests();
       renderHistory();
-      updateHistoryCounts();
     }catch(e){
       console.error(e);
       alert("Unable to reject. Check Firestore rules / indexes.");
     }
-  }
-
-  // ===== History counts =====
-  function updateHistoryCounts(){
-    hcApproved.textContent = String(cacheAllForApprover.filter(r => didIAct(r.approver_chain) === "approved").length);
-    hcRejected.textContent = String(cacheAllForApprover.filter(r => didIAct(r.approver_chain) === "rejected").length);
-    hcEscalated.textContent = String(cacheAllForApprover.filter(r => !!(r?.escalation?.requested)).length);
   }
 
   // ===== Buttons / events =====
@@ -1643,7 +1752,7 @@ textarea:focus{
     dashTo = fTo.value || "";
     await refreshCache();
     computeDashboardMetrics();
-    updateHistoryCounts();
+    renderHistory();
   });
 
   applyReqFilters.addEventListener("click", () => {
@@ -1656,6 +1765,21 @@ textarea:focus{
   hApproved.addEventListener("click", () => setHistoryTab("approved"));
   hRejected.addEventListener("click", () => setHistoryTab("rejected"));
   hEscalated.addEventListener("click", () => setHistoryTab("escalated"));
+  hIntimation.addEventListener("click", () => setHistoryTab("intimation"));
+
+  // History filters
+  hApplyFilters.addEventListener("click", () => renderHistory());
+  hClearFilters.addEventListener("click", () => {
+    hFrom.value = "";
+    hTo.value = "";
+    hRoll.value = "";
+    hYear.value = "all";
+    hHostel.value = "all";
+    hReason.value = "all";
+    hLateOnly.value = "no";
+    hNotVerifiedOnly.value = "no";
+    renderHistory();
+  });
 
   // ===== Reports UI =====
   function setRepMode(mode){
@@ -1712,29 +1836,28 @@ textarea:focus{
     clearToast(repToast);
   });
 
-  function getStudentYear(row){
-    return String(row.student_year ?? row.studentYear ?? "").trim();
-  }
-
   async function fetchFinalApprovedRowsForReport({ fromDate, toDate, year, roll }){
-    const meLower = currentUserEmailLower;
-
-    const fromISO = toStartOfDayISO(fromDate);
-    const toISO = toEndOfDayISO(toDate);
-
     if (!fromDate || !toDate) throw new Error("Please select From & To dates (IN datetime).");
 
-    // Firestore: status == approved_final OR approved_dean_final cannot be done in single query without OR.
-    // So fetch my scope in date range, then filter in JS.
-    const baseQ = query(
+    const { start, end } = dateRangeToTimestamps(fromDate, toDate);
+    if (!start || !end) throw new Error("Invalid date range.");
+
+    // IMPORTANT FIX: in_datetime is Timestamp, so query must use Timestamp range (not strings).
+    // Also: your previous code used array-contains meLower only; we keep fallback to raw.
+    const qLower = query(
       collection(db, "leave_requests"),
-      where("approver_emails", "array-contains", meLower),
-      where("in_datetime", ">=", fromISO),
-      where("in_datetime", "<=", toISO)
+      where("approver_emails", "array-contains", currentUserEmailLower),
+      where("in_datetime", ">=", start),
+      where("in_datetime", "<=", end)
+    );
+    const qRaw = query(
+      collection(db, "leave_requests"),
+      where("approver_emails", "array-contains", currentUserEmailRaw),
+      where("in_datetime", ">=", start),
+      where("in_datetime", "<=", end)
     );
 
-    const snap = await getDocs(baseQ);
-    let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    let rows = await tryGetDocs(qLower, qRaw);
 
     rows = rows.filter(r => isFinalApprovedStatus(r.status));
     rows = rows.filter(r => didIAct(r.approver_chain) === "approved");
@@ -1747,7 +1870,14 @@ textarea:focus{
       rows = rows.filter(r => normalizeRollno(r.student_rollno || "") === rr);
     }
 
-    rows.sort((a,b) => String(getInDT(a)||"").localeCompare(String(getInDT(b)||"")));
+    // sort by IN time
+    rows.sort((a,b) => {
+      const aa = getInDT(a); const bb = getInDT(b);
+      const ad = typeof aa?.toDate === "function" ? aa.toDate() : new Date(aa);
+      const bd = typeof bb?.toDate === "function" ? bb.toDate() : new Date(bb);
+      return (ad?.getTime?.()||0) - (bd?.getTime?.()||0);
+    });
+
     return rows;
   }
 
@@ -1794,11 +1924,7 @@ textarea:focus{
     let y = 92;
     lines.forEach((t) => { docPDF.text(t, 40, y); y += 14; });
 
-    const lateRows = rows.filter(r => {
-      const late = r?.arrival?.late_minutes ?? r?.arrival?.lateMinutes ?? 0;
-      const verified = !!(r?.arrival?.verified);
-      return verified && (Number(late) > 0);
-    });
+    const lateRows = rows.filter(r => isLateRow(r));
 
     docPDF.setFont("helvetica", "bold");
     docPDF.text(`Total Records: ${rows.length}    Late Comers (verified & late): ${lateRows.length}`, 40, y + 6);
@@ -1814,8 +1940,10 @@ textarea:focus{
       const inVal  = getInDT(r);
       const contact = String(r.contact_no || "").trim();
 
-      const actualIn = r?.arrival?.actual_in_datetime || "";
-      const lateMins = r?.arrival?.late_minutes ?? null;
+      const arrival = r.arrival || {};
+      const actualIn = arrival.actual_in_time || arrival.actualInTime || arrival.actual_in_datetime || null;
+      const lateMins = arrival.late_minutes ?? arrival.lateMinutes ?? null;
+
       const actualInTxt = actualIn ? fmtDT(actualIn) : "—";
       const lateTxt = (lateMins != null && Number(lateMins) > 0) ? formatLateMinutes(lateMins) : "—";
 
@@ -1861,7 +1989,6 @@ textarea:focus{
       }
     });
 
-    // Late Comers list section
     if (lateRows.length){
       docPDF.addPage();
       docPDF.setFont("helvetica", "bold");
@@ -1874,8 +2001,9 @@ textarea:focus{
         const rollno = normalizeRollno(r.student_rollno || "");
         const name = r.student_name || "—";
         const plannedIn = getInDT(r);
-        const actualIn = r?.arrival?.actual_in_datetime || "";
-        const lateMins = r?.arrival?.late_minutes ?? 0;
+        const arrival = r.arrival || {};
+        const actualIn = arrival.actual_in_time || arrival.actualInTime || arrival.actual_in_datetime || null;
+        const lateMins = arrival.late_minutes ?? arrival.lateMinutes ?? 0;
         return [
           String(i+1),
           rollno,
@@ -1989,4 +2117,3 @@ textarea:focus{
 </script>
 </body>
 </html>
-
