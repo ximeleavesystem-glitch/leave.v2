@@ -921,6 +921,56 @@ textarea:focus{
     if (r === 0) return `${h}h`;
     return `${h}h ${r}m`;
   }
+  function minutesToHM(mins){
+  const m = Math.max(0, Math.floor(Number(mins) || 0));
+  const h = Math.floor(m / 60);
+  const r = m % 60;
+  if (h <= 0) return `${r}m`;
+  if (r === 0) return `${h}h`;
+  return `${h}h ${r}m`;
+}
+
+function getArrivalStatusText(row){
+  // planned IN
+  const plannedInVal = getInDT(row);
+  let plannedIn = null;
+
+  if (plannedInVal && typeof plannedInVal?.toDate === "function") plannedIn = plannedInVal.toDate();
+  else plannedIn = plannedInVal ? new Date(String(plannedInVal)) : null;
+
+  if (!plannedIn || isNaN(plannedIn)) return "";
+
+  const now = new Date();
+
+  // Rule 1: if IN time not crossed => blank
+  if (now < plannedIn) return "";
+
+  const arrival = row.arrival || {};
+  const verified = !!arrival.verified;
+
+  // Rule 2: IN time crossed but not verified
+  if (!verified) return "Not yet reached";
+
+  // actual in time
+  const actualVal =
+    arrival.actual_in_time ||
+    arrival.actual_in_datetime ||
+    arrival.verified_at ||
+    arrival.verifiedAt ||
+    null;
+
+  let actualIn = null;
+  if (actualVal && typeof actualVal?.toDate === "function") actualIn = actualVal.toDate();
+  else actualIn = actualVal ? new Date(String(actualVal)) : null;
+
+  if (!actualIn || isNaN(actualIn)) return "Reached";
+
+  const diffMins = Math.round((actualIn.getTime() - plannedIn.getTime()) / 60000);
+
+  if (diffMins > 0) return `Late by ${minutesToHM(diffMins)}`;
+  if (diffMins === 0) return "On time";
+  return `Before time by ${minutesToHM(Math.abs(diffMins))}`;
+}
 
   function isFinalApprovedStatus(st){
     const s = String(st || "").toLowerCase();
@@ -1959,53 +2009,48 @@ const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.ro
 
     const lateRows = rows.filter(r => isLateRow(r));
 
-    docPDF.setFont("helvetica", "bold");
-    docPDF.text(`Total Records: ${rows.length}    Late Comers (verified & late): ${lateRows.length}`, 40, y + 6);
-    docPDF.setFont("helvetica", "normal");
+   docPDF.setFont("helvetica", "bold");
+docPDF.text(`Total Records: ${rows.length}`, 40, y + 6);
+docPDF.setFont("helvetica", "normal");
+   const tableBody = rows.map((r, idx) => {
+  const studentName = r.student_name || "";
+  const rollno = normalizeRollno(r.student_rollno || "");
+  const yearVal = getStudentYear(r) || "";
+  const hostel = String(r.student_hostel || "").trim();
+  const room = String(r.student_room_no || "").trim();
+  const outVal = getOutDT(r);
+  const inVal  = getInDT(r);
+  const contact = String(r.contact_no || "").trim();
 
-    const tableBody = rows.map((r, idx) => {
-      const studentName = r.student_name || "";
-      const rollno = normalizeRollno(r.student_rollno || "");
-      const yearVal = getStudentYear(r) || "";
-      const hostel = String(r.student_hostel || "").trim();
-      const room = String(r.student_room_no || "").trim();
-      const outVal = getOutDT(r);
-      const inVal  = getInDT(r);
-      const contact = String(r.contact_no || "").trim();
+  const arrivalStatus = getArrivalStatusText(r);
 
-      const arrival = r.arrival || {};
-      const actualIn = arrival.actual_in_time || arrival.actualInTime || arrival.actual_in_datetime || null;
-      const lateMins = arrival.late_minutes ?? arrival.lateMinutes ?? null;
+  const reasonCat = String(r.reason_category || "—").trim();
+  const reasonTxt = String(r.reason_text || r.reason || "").trim();
+  const reason = reasonTxt ? `${reasonCat} — ${reasonTxt}` : reasonCat;
 
-      const actualInTxt = actualIn ? fmtDT(actualIn) : "—";
-      const lateTxt = (lateMins != null && Number(lateMins) > 0) ? formatLateMinutes(lateMins) : "—";
-
-      const reasonCat = String(r.reason_category || "—").trim();
-      const reasonTxt = String(r.reason_text || r.reason || "").trim();
-      const reason = reasonTxt ? `${reasonCat} — ${reasonTxt}` : reasonCat;
-
-      return [
-        String(idx + 1),
-        rollno || "—",
-        studentName || "—",
-        yearVal || "—",
-        hostel || "—",
-        room || "—",
-        fmtDT(outVal),
-        fmtDT(inVal),
-        actualInTxt,
-        lateTxt,
-        contact || "—",
-        reason || "—"
-      ];
-    });
+  return [
+    String(idx + 1),
+    rollno || "—",
+    studentName || "—",
+    yearVal || "—",
+    hostel || "—",
+    room || "—",
+    fmtDT(outVal),
+    fmtDT(inVal),
+    arrivalStatus,
+    contact || "—",
+    reason || "—"
+  ];
+});
 
     docPDF.autoTable({
       startY: y + 18,
-      head: [[
-        "S.No","Roll No","Student Name","Year","Hostel","Room",
-        "Out Date & Time","In Date & Time","Actual In Time","Late By","Contact","Reason"
-      ]],
+    head: [[
+  "S.No","Roll No","Student Name","Year","Hostel","Room",
+  "Out Date & Time","In Date & Time",
+  "Arrival Status",
+  "Contact","Reason"
+]],
       body: tableBody,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 4, overflow: "linebreak" },
       headStyles: { fillColor: [193, 18, 31], textColor: 255, fontStyle: "bold" },
@@ -2021,31 +2066,6 @@ const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.ro
         docPDF.setTextColor(15, 23, 42);
       }
     });
-
-    if (lateRows.length){
-      docPDF.addPage();
-      docPDF.setFont("helvetica", "bold");
-      docPDF.setFontSize(12);
-      docPDF.setTextColor(193,18,31);
-      docPDF.text("Late Comers List (Verified & Late > 0)", 40, 50);
-      docPDF.setTextColor(15,23,42);
-
-      const body2 = lateRows.map((r, i) => {
-        const rollno = normalizeRollno(r.student_rollno || "");
-        const name = r.student_name || "—";
-        const plannedIn = getInDT(r);
-        const arrival = r.arrival || {};
-        const actualIn = arrival.actual_in_time || arrival.actualInTime || arrival.actual_in_datetime || null;
-        const lateMins = arrival.late_minutes ?? arrival.lateMinutes ?? 0;
-        return [
-          String(i+1),
-          rollno,
-          name,
-          fmtDT(plannedIn),
-          actualIn ? fmtDT(actualIn) : "—",
-          formatLateMinutes(lateMins)
-        ];
-      });
 
       docPDF.autoTable({
         startY: 70,
@@ -2150,4 +2170,5 @@ const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.ro
 </script>
 </body>
 </html>
+
 
