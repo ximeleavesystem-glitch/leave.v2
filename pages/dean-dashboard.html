@@ -149,6 +149,7 @@
     .pill.pending{ color: var(--warn); border-color: rgba(181,71,8,.25); background: rgba(181,71,8,.06); }
     .pill.approved{ color: var(--good); border-color: rgba(15,118,110,.25); background: rgba(15,118,110,.06); }
     .pill.rejected{ color: var(--bad); border-color: rgba(180,35,24,.22); background: rgba(180,35,24,.06); }
+    .pill.locked{ color:#374151; border-color: rgba(55,65,81,.25); background: rgba(55,65,81,.06); }
 
     /* Filters */
     .filters{
@@ -282,6 +283,12 @@
     }
     .actionBtn:hover{ transform: translateY(-1px); }
     .actionBtn:active{ transform: translateY(0px); opacity:.92; }
+    .actionBtn:disabled{
+      cursor:not-allowed;
+      opacity:.55;
+      transform:none !important;
+      box-shadow:none !important;
+    }
     .approveBtn{ background: linear-gradient(135deg, var(--good), #14b8a6); color:#fff; }
     .rejectBtn{ background: linear-gradient(135deg, var(--bad), #ff3b3b); color:#fff; }
 
@@ -754,6 +761,14 @@
     function getOutDT(r){ return toISO(r.out_datetime || r.outDT || r.outDateTime || r.out_time || r.outTime || ""); }
     function getInDT(r){ return toISO(r.in_datetime || r.inDT || r.inDateTime || r.in_time || r.inTime || ""); }
 
+    // ✅ NEW: lock logic
+    function canActBeforeOut(r){
+      const outISO = getOutDT(r);
+      const outD = parseISO(outISO);
+      if (!outD) return false;
+      return Date.now() < outD.getTime();
+    }
+
     function getArrivalVerified(r){
       const v = r?.arrival?.verified;
       return v === true || String(v).toLowerCase() === "true";
@@ -848,6 +863,18 @@
       await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
     }
 
+    // ✅ NEW: revoke/disable public gatepass (if Dean rejects or flips to reject)
+    async function revokePublicGatepass(requestId, note){
+      const payload = {
+        status: "revoked",
+        revoked_at: isoNow(),
+        revoked_note: String(note || "Dean rejected / decision changed").slice(0, 250),
+        updatedAt: serverTimestamp(),
+        updated_at: serverTimestamp()
+      };
+      await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
+    }
+
     // ✅ Drive-photo resolver logic
     function extractDriveId(url){
       const u = String(url || "").trim();
@@ -911,7 +938,6 @@
     }
 
     function getApprovedBy(r){
-      // 1) explicit fields (if you store them)
       const direct =
         r.approved_by || r.approvedBy ||
         r.final_approved_by || r.finalApprovedBy ||
@@ -919,9 +945,7 @@
 
       if (direct) return String(direct);
 
-      // 2) scan approver_chain
       const chain = Array.isArray(r.approver_chain) ? r.approver_chain : [];
-      // find last "approved"
       for (let i = chain.length - 1; i >= 0; i--){
         const x = chain[i] || {};
         const act = String(x.action || x.status || "").toLowerCase();
@@ -931,8 +955,6 @@
           if (x.user_email) return String(x.user_email);
         }
       }
-
-      // 3) fallback: if approved_final and current holder is empty, show "System"
       return "";
     }
 
@@ -941,44 +963,17 @@
       const from = dFrom.value;
       const to = dTo.value;
 
-      // 1) Pending with dean (pending_dean)
-      const qPending = query(
-        collection(db, "leave_requests"),
-        where("status","==","pending_dean"),
-        limit(5000)
-      );
+      const qPending = query(collection(db, "leave_requests"), where("status","==","pending_dean"), limit(5000));
+      const qDeanApproved = query(collection(db, "leave_requests"), where("status","==","approved_dean_final"), limit(5000));
+      const qDeanRejected = query(collection(db, "leave_requests"), where("status","==","rejected_dean"), limit(5000));
+      const qIntimations = query(collection(db, "leave_requests"), where("status","==","approved_final"), limit(5000));
 
-      // 2) Dean acted
-      const qDeanApproved = query(
-        collection(db, "leave_requests"),
-        where("status","==","approved_dean_final"),
-        limit(5000)
-      );
-      const qDeanRejected = query(
-        collection(db, "leave_requests"),
-        where("status","==","rejected_dean"),
-        limit(5000)
-      );
-
-      // 3) Intimations = approved_final + NOT escalated
-      const qIntimations = query(
-        collection(db, "leave_requests"),
-        where("status","==","approved_final"),
-        limit(5000)
-      );
-
-      const [sp, sa, sr, si] = await Promise.all([
-        getDocs(qPending),
-        getDocs(qDeanApproved),
-        getDocs(qDeanRejected),
-        getDocs(qIntimations)
-      ]);
+      const [sp, sa, sr, si] = await Promise.all([ getDocs(qPending), getDocs(qDeanApproved), getDocs(qDeanRejected), getDocs(qIntimations) ]);
 
       const countByOutRange = (docsSnap) =>
         docsSnap.docs.map(d => d.data()).filter(x => inDateRangeISO(getOutDT(x), from, to)).length;
 
       const pendingRows = sp.docs.map(d => d.data()).filter(r => {
-        // extra safety: only those for dean
         const holder = normalizeEmail(r.current?.holder_email || r.current_holder_email || "");
         return holder ? holder === normalizeEmail(DEAN_EMAIL) : true;
       });
@@ -1009,7 +1004,6 @@
       const email = r.student_email || r.student?.email || "—";
       const room = r.student_room_no || r.student?.room || r.student?.roomNo || "—";
 
-      // ✅ FIX: reason fallback list expanded
       const reason = r.reason_text || r.reason || r.reasonText || r.leave_reason || r.leaveReason || "-";
 
       const outVal = getOutDT(r) || "";
@@ -1043,12 +1037,20 @@
       const escBy = r.escalation?.requested_by || "";
       const escReason = r.escalation?.reason || "";
 
+      const locked = !canActBeforeOut(r);
+
       text.innerHTML = `
         <div class="studentName">${studentName}</div>
         <div class="studentMeta">${roll} • ${email} • Room ${room}</div>
         <div class="tagType"><span class="miniDot"></span>Escalated Request (Dean Action)</div>
         <div class="studentMeta" style="margin-top:6px;">
           <b>Escalated By:</b> ${escBy || "—"} &nbsp; • &nbsp; <b>Escalation Reason:</b> ${escReason || "—"}
+        </div>
+        <div class="studentMeta" style="margin-top:6px;">
+          ${locked
+            ? `<span class="pill locked">LOCKED (Out time passed)</span>`
+            : `<span class="pill pending">EDITABLE until OUT time</span>`
+          }
         </div>
       `;
 
@@ -1073,6 +1075,7 @@
       const ta = document.createElement("textarea");
       ta.id = remarkId;
       ta.placeholder = "Dean Remark (optional)";
+      ta.disabled = locked;
       card.appendChild(ta);
 
       const actions = document.createElement("div");
@@ -1082,12 +1085,14 @@
       approve.className = "actionBtn approveBtn";
       approve.type = "button";
       approve.textContent = "Approve";
+      approve.disabled = locked;
       approve.addEventListener("click", () => deanApprove(r.id));
 
       const reject = document.createElement("button");
       reject.className = "actionBtn rejectBtn";
       reject.type = "button";
       reject.textContent = "Reject";
+      reject.disabled = locked;
       reject.addEventListener("click", () => deanReject(r.id));
 
       actions.appendChild(approve);
@@ -1165,6 +1170,11 @@
         : `<b style="color:var(--warn)">Arrival:</b> Not verified`;
 
       const status = String(r.status || "").toLowerCase();
+      const editable = canActBeforeOut(r);
+
+      const editPill = editable
+        ? `<span class="pill pending">EDITABLE until OUT time</span>`
+        : `<span class="pill locked">LOCKED (Out time passed)</span>`;
 
       card.innerHTML = `
         <div class="cardTop">
@@ -1176,6 +1186,9 @@
               <div class="studentMeta" style="margin-top:6px;">
                 ${lateTxt}
                 ${verified && actual ? ` &nbsp; • &nbsp; <b>Actual In:</b> ${fmtDT(actual)}` : ``}
+              </div>
+              <div class="studentMeta" style="margin-top:6px;">
+                ${editPill}
               </div>
             </div>
           </div>
@@ -1191,22 +1204,41 @@
 
       const sb = card.querySelector(".studentBlock");
       sb.prepend(buildAvatarNode(studentName, photo));
+
+      // ✅ NEW: Change-decision buttons (only before OUT time)
+      if (status === "approved_dean_final" || status === "rejected_dean"){
+        const actions = document.createElement("div");
+        actions.className = "actionsRow";
+
+        const btnApprove = document.createElement("button");
+        btnApprove.className = "actionBtn approveBtn";
+        btnApprove.type = "button";
+        btnApprove.textContent = (status === "approved_dean_final") ? "Already Approved" : "Change to Approved";
+        btnApprove.disabled = !editable || (status === "approved_dean_final");
+        btnApprove.addEventListener("click", () => deanChangeDecision(r.id, "approved_dean_final"));
+
+        const btnReject = document.createElement("button");
+        btnReject.className = "actionBtn rejectBtn";
+        btnReject.type = "button";
+        btnReject.textContent = (status === "rejected_dean") ? "Already Rejected" : "Change to Rejected";
+        btnReject.disabled = !editable || (status === "rejected_dean");
+        btnReject.addEventListener("click", () => deanChangeDecision(r.id, "rejected_dean"));
+
+        actions.appendChild(btnApprove);
+        actions.appendChild(btnReject);
+        card.appendChild(actions);
+      }
+
       return card;
     }
 
     /* ---------------- Load lists ---------------- */
     async function loadEscalations(){
       escalationsList.innerHTML = "";
-      const q1 = query(
-        collection(db, "leave_requests"),
-        where("status", "==", "pending_dean"),
-        limit(5000)
-      );
-
+      const q1 = query(collection(db, "leave_requests"), where("status", "==", "pending_dean"), limit(5000));
       const snap = await getDocs(q1);
       const rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // extra safety: only dean mailbox
       const deanRows = rows.filter(r => {
         const holder = normalizeEmail(r.current?.holder_email || r.current_holder_email || "");
         return !holder || holder === normalizeEmail(DEAN_EMAIL);
@@ -1226,23 +1258,16 @@
 
     async function loadIntimations(){
       intimationList.innerHTML = "";
-      const q1 = query(
-        collection(db, "leave_requests"),
-        where("status", "==", "approved_final"),
-        limit(5000)
-      );
-
+      const q1 = query(collection(db, "leave_requests"), where("status", "==", "approved_final"), limit(5000));
       const snap = await getDocs(q1);
       let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
 
-      // Only "no dean action" items
       rows = rows.filter(r => {
         const requested = !!(r.escalation && r.escalation.requested);
         const deanAction = String(r.escalation?.dean_action || "").toLowerCase();
         return !requested && (deanAction === "not_required" || deanAction === "" || deanAction === "na");
       });
 
-      // filters
       const s = (iSearch.value||"").trim();
       const y = iYear.value;
       const h = iHostel.value;
@@ -1256,8 +1281,6 @@
         inDateRangeISO(getOutDT(r), from, to)
       );
 
-      // ✅ Not Returned Yet quick filter:
-      // arrival.verified == false AND now > in_datetime
       if (intimationsNotReturnedOnly){
         const now = Date.now();
         rows = rows.filter(r => {
@@ -1307,7 +1330,6 @@
         inDateRangeISO(getOutDT(r), from, to)
       );
 
-      // ✅ Not Returned Yet filter ALSO in History
       if (historyNotReturnedOnly){
         const now = Date.now();
         rows = rows.filter(r => {
@@ -1318,7 +1340,6 @@
         });
       }
 
-      // sort by dean action time if present, else updated_at fallback
       rows.sort((a,b) => {
         const ta = a.dean_acted_at || a.final_approved_at || a.final_rejected_at || a.updated_at || getOutDT(a) || "";
         const tb = b.dean_acted_at || b.final_approved_at || b.final_rejected_at || b.updated_at || getOutDT(b) || "";
@@ -1392,8 +1413,15 @@
       if (!snap.exists()) return;
 
       const r = snap.data();
+
       if (String(r.status||"").toLowerCase() !== "pending_dean"){
         alert("This request is not pending with Dean.");
+        return;
+      }
+
+      // ✅ Lock check (must be before OUT time)
+      if (!canActBeforeOut(r)){
+        alert("Out time already reached. Dean action is locked for this request.");
         return;
       }
 
@@ -1427,7 +1455,6 @@
 
       try{
         await updateDoc(ref, updates);
-        // ✅ create public gatepass doc for QR / gatepass public page
         await upsertPublicGatepass(id, { ...r, ...updates });
 
         await loadDashboard();
@@ -1446,8 +1473,15 @@
       if (!snap.exists()) return;
 
       const r = snap.data();
+
       if (String(r.status||"").toLowerCase() !== "pending_dean"){
         alert("This request is not pending with Dean.");
+        return;
+      }
+
+      // ✅ Lock check (must be before OUT time)
+      if (!canActBeforeOut(r)){
+        alert("Out time already reached. Dean action is locked for this request.");
         return;
       }
 
@@ -1478,12 +1512,95 @@
 
       try{
         await updateDoc(ref, updates);
+        await revokePublicGatepass(id, remark || "Dean rejected");
+
         await loadDashboard();
         await loadEscalations();
         await loadHistory();
       }catch(e){
         console.error(e);
         alert("Unable to reject. Check Firestore rules / indexes.");
+      }
+    }
+
+    // ✅ NEW: Change decision in History before OUT time
+    async function deanChangeDecision(id, targetStatus){
+      const ref = doc(db, "leave_requests", id);
+      const snap = await getDoc(ref);
+      if (!snap.exists()) return;
+
+      const r = snap.data();
+      const cur = String(r.status || "").toLowerCase();
+      const target = String(targetStatus || "").toLowerCase();
+
+      if (!(cur === "approved_dean_final" || cur === "rejected_dean")){
+        alert("Only Dean-acted requests can be changed here.");
+        return;
+      }
+
+      // ✅ Lock check
+      if (!canActBeforeOut(r)){
+        alert("Out time already reached. Decision change is locked.");
+        return;
+      }
+
+      if (cur === target){
+        alert("This request is already in that status.");
+        return;
+      }
+
+      const remark = (prompt("Dean remark for decision change (optional):") || "").trim();
+
+      const action = (target === "approved_dean_final") ? "approved" : "rejected";
+      const { ok, list } = updateDeanChain(r.approver_chain, remark, action);
+      if (!ok){
+        alert("Dean stage not found in approver_chain.");
+        return;
+      }
+
+      const nowISO = isoNow();
+
+      const updates = {
+        approver_chain: list,
+        status: target,
+
+        escalation: { ...(r.escalation || {}), requested: true, dean_action: action, dean_acted_at: nowISO },
+
+        current_holder_email: null,
+        current: { ...(r.current || {}), holder_email: null, holder_role: null, stage: null },
+
+        dean_acted_by: normalizeEmail(DEAN_EMAIL),
+        dean_acted_at: nowISO,
+
+        updated_at: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      };
+
+      if (target === "approved_dean_final"){
+        updates.final_approved_by = normalizeEmail(DEAN_EMAIL);
+        updates.final_approved_at = nowISO;
+        updates.final_rejected_by = null;
+        updates.final_rejected_at = null;
+      } else {
+        updates.final_rejected_by = normalizeEmail(DEAN_EMAIL);
+        updates.final_rejected_at = nowISO;
+      }
+
+      try{
+        await updateDoc(ref, updates);
+
+        if (target === "approved_dean_final"){
+          await upsertPublicGatepass(id, { ...r, ...updates });
+        } else {
+          await revokePublicGatepass(id, remark || "Dean changed to rejected");
+        }
+
+        await loadDashboard();
+        await loadEscalations();
+        await loadHistory();
+      }catch(e){
+        console.error(e);
+        alert("Unable to change decision. Check Firestore rules / indexes.");
       }
     }
 
@@ -1521,7 +1638,6 @@
         throw new Error("Enter Roll No for Student-wise report.");
       }
 
-      // Approved final (intimations) + Dean approved final
       const [sFinal, sDeanApproved] = await Promise.all([
         getDocs(query(collection(db, "leave_requests"), where("status","==","approved_final"), limit(5000))),
         getDocs(query(collection(db, "leave_requests"), where("status","==","approved_dean_final"), limit(5000)))
@@ -1532,7 +1648,6 @@
         ...sDeanApproved.docs.map(d => ({ id:d.id, ...d.data() }))
       ];
 
-      // Time filter by IN datetime
       rows = rows.filter(r => inDateRangeISO(getInDT(r), from, to));
 
       if (year){
