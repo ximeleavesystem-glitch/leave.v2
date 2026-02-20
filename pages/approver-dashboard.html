@@ -427,6 +427,31 @@ textarea:focus{
 .approveBtn{ background: linear-gradient(135deg, var(--good), #14b8a6); }
 .rejectBtn{ background: linear-gradient(135deg, var(--bad), #ff3b3b); }
 
+.changeBtn{
+  border:none;
+  padding:10px 14px;
+  border-radius:14px;
+  font-weight:1000;
+  cursor:pointer;
+  transition:.15s ease;
+  box-shadow: 0 10px 22px rgba(2,6,23,.10);
+  color:#fff;
+}
+.changeBtn:hover{ transform: translateY(-1px); }
+.changeApprove{ background: linear-gradient(135deg, var(--good), #14b8a6); }
+.changeReject{ background: linear-gradient(135deg, var(--bad), #ff3b3b); }
+
+.lockNote{
+  margin-top:10px;
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px dashed rgba(180,35,24,.35);
+  background: rgba(180,35,24,.05);
+  color:#7a1512;
+  font-weight:900;
+  font-size:12.5px;
+}
+
 .inlineOpt{
   display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   padding:10px 12px; border-radius:16px; border:1px dashed rgba(193,18,31,.3);
@@ -815,12 +840,6 @@ textarea:focus{
   const IMG_PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
   // ===== Helpers =====
-  function showToast(el, msg, type="good"){
-    el.className = "toast show " + (type === "bad" ? "bad" : "good");
-    el.textContent = msg;
-  }
-  function clearToast(el){ el.className = "toast"; el.textContent = ""; }
-
   function isoNow(){ return new Date().toISOString(); }
   function normalizeEmail(v){ return String(v || "").trim().toLowerCase(); }
   function normalizeRollno(v){ return String(v || "").trim().toUpperCase(); }
@@ -863,6 +882,28 @@ textarea:focus{
   function getOutDT(row){ return row.out_datetime || row.outDT || row.outDateTime || ""; }
   function getInDT(row){ return row.in_datetime || row.inDT || row.inDateTime || ""; }
 
+  function toJSDate(val){
+    if (!val) return null;
+    if (val instanceof Date) return val;
+    if (typeof val?.toDate === "function") return val.toDate(); // Timestamp
+    const d = new Date(val);
+    return isNaN(d) ? null : d;
+  }
+
+  function isBeforeOutTime(row){
+    const outVal = getOutDT(row);
+    const outD = toJSDate(outVal);
+    if (!outD) return false;
+    return new Date() < outD;
+  }
+
+  function isEscalatedLocked(row){
+    const st = String(row?.status || "").toLowerCase();
+    if (st === "pending_dean") return true;
+    if (!!row?.escalation?.requested) return true;
+    return false;
+  }
+
   function getCurrentHolderEmail(row){
     return String(row?.current?.holder_email || row?.current_holder_email || row?.currentHolderEmail || row?.current_holder || "").trim();
   }
@@ -873,12 +914,8 @@ textarea:focus{
   function inDateRangeOutDT(row, fromDate, toDate){
     const outVal = getOutDT(row);
     if (!outVal) return false;
-
-    let outDate = null;
-    if (typeof outVal?.toDate === "function") outDate = outVal.toDate();
-    else outDate = new Date(outVal);
-
-    if (!outDate || isNaN(outDate)) return false;
+    const outDate = toJSDate(outVal);
+    if (!outDate) return false;
 
     const s = parseDateStart(fromDate);
     const e = parseDateEnd(toDate);
@@ -888,11 +925,8 @@ textarea:focus{
   }
 
   function fmtDT(val){
-    let dt = null;
-    if (!val) return "-";
-    if (typeof val?.toDate === "function") dt = val.toDate();
-    else dt = new Date(val);
-    if (!dt || isNaN(dt)) return "-";
+    const dt = toJSDate(val);
+    if (!dt) return "-";
     const dd = String(dt.getDate()).padStart(2,"0");
     const mm = String(dt.getMonth()+1).padStart(2,"0");
     const yyyy = dt.getFullYear();
@@ -934,22 +968,15 @@ textarea:focus{
 
   function getArrivalStatusText(row){
     const plannedInVal = getInDT(row);
-    let plannedIn = null;
-
-    if (plannedInVal && typeof plannedInVal?.toDate === "function") plannedIn = plannedInVal.toDate();
-    else plannedIn = plannedInVal ? new Date(String(plannedInVal)) : null;
-
-    if (!plannedIn || isNaN(plannedIn)) return "";
+    const plannedIn = toJSDate(plannedInVal);
+    if (!plannedIn) return "";
 
     const now = new Date();
-
-    // IN time not crossed => blank
     if (now < plannedIn) return "";
 
     const arrival = row.arrival || {};
     const verified = !!arrival.verified;
 
-    // IN crossed but not verified
     if (!verified) return "Not yet reached";
 
     const actualVal =
@@ -959,11 +986,8 @@ textarea:focus{
       arrival.verifiedAt ||
       null;
 
-    let actualIn = null;
-    if (actualVal && typeof actualVal?.toDate === "function") actualIn = actualVal.toDate();
-    else actualIn = actualVal ? new Date(String(actualVal)) : null;
-
-    if (!actualIn || isNaN(actualIn)) return "Reached";
+    const actualIn = toJSDate(actualVal);
+    if (!actualIn) return "Reached";
 
     const diffMins = Math.round((actualIn.getTime() - plannedIn.getTime()) / 60000);
 
@@ -1099,7 +1123,7 @@ textarea:focus{
       lineBC.style.display = "block";
       const batches = bcYears
         .filter(y => y === "1" || y === "2")
-        .map(y => YEAR_TO_BATCH[y] || `Year ${y}`)
+        .map(y => ({ "1":"Batch 9", "2":"Batch 8" }[y] || `Year ${y}`))
         .join(", ");
       apBC.textContent = batches;
     } else {
@@ -1296,9 +1320,8 @@ textarea:focus{
         rows = rows.filter(r => inDateRangeOutDT(r, dashFrom, dashTo));
 
         rows.sort((a,b) => {
-          const aa = getOutDT(a); const bb = getOutDT(b);
-          const ad = typeof aa?.toDate === "function" ? aa.toDate() : new Date(aa);
-          const bd = typeof bb?.toDate === "function" ? bb.toDate() : new Date(bb);
+          const ad = toJSDate(getOutDT(a));
+          const bd = toJSDate(getOutDT(b));
           return (bd?.getTime?.()||0) - (ad?.getTime?.()||0);
         });
 
@@ -1332,12 +1355,7 @@ textarea:focus{
       .filter(r => isPendingForMe(r))
       .filter(r => inDateRangeOutDT(r, reqFrom, reqTo));
 
-    rows.sort((a,b) => {
-      const aa = getOutDT(a); const bb = getOutDT(b);
-      const ad = typeof aa?.toDate === "function" ? aa.toDate() : new Date(aa);
-      const bd = typeof bb?.toDate === "function" ? bb.toDate() : new Date(bb);
-      return (bd?.getTime?.()||0) - (ad?.getTime?.()||0);
-    });
+    rows.sort((a,b) => (toJSDate(getOutDT(b))?.getTime()||0) - (toJSDate(getOutDT(a))?.getTime()||0));
 
     requestsContainer.innerHTML = "";
 
@@ -1476,6 +1494,15 @@ textarea:focus{
     renderHistory();
   }
 
+  function canChangeMyDecision(row){
+    // Must be something I acted on, must be BEFORE OUT time, and MUST NOT be escalated
+    const myAct = didIAct(row.approver_chain);
+    if (!myAct) return false;
+    if (!isBeforeOutTime(row)) return false;
+    if (isEscalatedLocked(row)) return false;
+    return true;
+  }
+
   function renderHistory(){
     let rows = [];
 
@@ -1494,12 +1521,7 @@ textarea:focus{
 
     rows = applyHistoryFilters(rows);
 
-    rows.sort((a,b) => {
-      const aa = getOutDT(a); const bb = getOutDT(b);
-      const ad = typeof aa?.toDate === "function" ? aa.toDate() : new Date(aa);
-      const bd = typeof bb?.toDate === "function" ? bb.toDate() : new Date(bb);
-      return (bd?.getTime?.()||0) - (ad?.getTime?.()||0);
-    });
+    rows.sort((a,b) => (toJSDate(getOutDT(b))?.getTime()||0) - (toJSDate(getOutDT(a))?.getTime()||0));
 
     updateHistoryCounts();
     historyContainer.innerHTML = "";
@@ -1534,6 +1556,10 @@ textarea:focus{
 
       const arrivalLine = computeArrivalStatusLine(r);
 
+      const allowChange = canChangeMyDecision(r);
+      const myAction = didIAct(r.approver_chain); // approved / rejected
+      const changeRemarkId = `chg_remark_${r.id}`;
+
       const card = document.createElement("section");
       card.className = "requestCard";
       card.innerHTML = `
@@ -1555,10 +1581,30 @@ textarea:focus{
           <div class="kv"><div class="k">IN DATE & TIME</div><div class="v">${fmtDT(inVal)}</div></div>
           <div class="kv reasonBox"><div class="k">REASON</div><div class="v">${reasonLine || "-"}</div></div>
         </div>
+
+        ${
+          allowChange ? `
+            <textarea id="${changeRemarkId}" placeholder="Remark for change (optional)"></textarea>
+            <div class="actions">
+              ${myAction !== "approved" ? `<button class="changeBtn changeApprove" data-id="${r.id}" data-action="approved" type="button">Change to APPROVE</button>` : ``}
+              ${myAction !== "rejected" ? `<button class="changeBtn changeReject" data-id="${r.id}" data-action="rejected" type="button">Change to REJECT</button>` : ``}
+            </div>
+            <div class="smallNote">Allowed only until OUT time. Once escalated to Dean, it becomes locked.</div>
+          ` : (isEscalatedLocked(r) ? `<div class="lockNote">Locked: Escalated to Dean / pending Dean. No changes allowed.</div>` : ``)
+        }
       `;
       historyContainer.appendChild(card);
       hydrateStudentPhoto(card, roll, studentName, r);
     }
+
+    // Wire change buttons
+    historyContainer.querySelectorAll(".changeBtn").forEach(btn => {
+      btn.addEventListener("click", async () => {
+        const id = btn.dataset.id;
+        const action = btn.dataset.action; // approved/rejected
+        await handleChangeDecision(id, action);
+      });
+    });
   }
 
   function updateHistoryCounts(){
@@ -1594,7 +1640,26 @@ textarea:focus{
     await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
   }
 
-  // ===== Approve / Reject =====
+  async function revokePublicGatepass(requestId, reason="decision_changed"){
+    // We keep document (no delete) but mark invalid
+    const payload = {
+      status: "revoked",
+      revoked_at: serverTimestamp(),
+      revokedAt: serverTimestamp(),
+      revoked_by: currentUserEmailLower,
+      revoke_reason: String(reason || "decision_changed"),
+      updatedAt: serverTimestamp(),
+      updated_at: serverTimestamp()
+    };
+    try{
+      await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
+    }catch(e){
+      // If rules disallow, ignore silently (but ideally allow it)
+      console.warn("Unable to revoke gatepass_public:", e);
+    }
+  }
+
+  // ===== Approve / Reject helpers =====
   function ensureDeanStage(chain, deanEmail){
     const arr = Array.isArray(chain) ? [...chain] : [];
     const exists = arr.some(x => String(x?.role || "").toLowerCase() === "dean");
@@ -1617,19 +1682,11 @@ textarea:focus{
     const meLower = currentUserEmailLower;
     const meRaw = currentUserEmailRaw;
 
+    // Prefer updating my own entry (even if already acted)
     let idx = arr.findIndex(x => {
       const e = String(x?.email || "").trim();
-      const ok = e === meRaw || e.toLowerCase() === meLower;
-      const st = String(x?.action || x?.status || "").toLowerCase();
-      return ok && (st === "pending" || st === "");
+      return e === meRaw || e.toLowerCase() === meLower;
     });
-
-    if (idx === -1){
-      idx = arr.findIndex(x => {
-        const e = String(x?.email || "").trim();
-        return e === meRaw || e.toLowerCase() === meLower;
-      });
-    }
 
     if (idx >= 0){
       arr[idx] = { ...arr[idx], action, status: action, acted_at: isoNow(), actedAt: isoNow(), remark: remark || "" };
@@ -1648,6 +1705,77 @@ textarea:focus{
     return arr;
   }
 
+  // ===== Change decision (History) =====
+  async function handleChangeDecision(requestId, newAction){
+    const r = cacheAllForApprover.find(x => x.id === requestId);
+    if (!r) return;
+
+    if (!didIAct(r.approver_chain)){
+      alert("You did not act on this request.");
+      return;
+    }
+    if (!isBeforeOutTime(r)){
+      alert("Cannot change decision after OUT time.");
+      return;
+    }
+    if (isEscalatedLocked(r)){
+      alert("Cannot change once escalated to Dean / pending Dean.");
+      return;
+    }
+
+    const remark = (document.getElementById(`chg_remark_${requestId}`)?.value || "").trim();
+    const chain0 = Array.isArray(r.approver_chain) ? r.approver_chain : [];
+    const chain = markMyChainAction(chain0, newAction, remark);
+
+    // Derive overall status update based on original route stage role
+    // Your system uses:
+    // - Warden approvals are final
+    // - Batch Coordinator approvals can be final OR escalated (but escalation is locked, so here it's always non-escalated)
+    // - Dean approvals are final (but if dean action exists, escalation.requested would be true => locked already)
+    const holderRoleL1 = String(r?.routing?.l1_role || "").toLowerCase(); // warden or batch_coordinator
+    const finalStatus =
+      (newAction === "approved")
+        ? ( (String(r.status||"").toLowerCase() === "approved_dean_final") ? "approved_dean_final" : "approved_final" )
+        : ( (String(r.status||"").toLowerCase() === "rejected_dean") ? "rejected_dean" : "rejected_l1" );
+
+    const updates = {
+      approver_chain: chain,
+      approver_emails: (Array.isArray(r.approver_emails) ? r.approver_emails : []).length ? r.approver_emails : chain.map(x => normalizeEmail(x.email)).filter(Boolean),
+      status: finalStatus,
+      current: { holder_email: null, holder_role: "", stage: "" },
+      current_holder_email: null,
+      updated_at: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+      // also ensure escalation stays false in non-escalated flow
+      escalation: {
+        ...(r.escalation || {}),
+        requested: false,
+        dean_action: "not_required"
+      }
+    };
+
+    try{
+      await updateDoc(doc(db, "leave_requests", requestId), updates);
+
+      // Gatepass: if moving away from approved => revoke
+      if (newAction !== "approved"){
+        await revokePublicGatepass(requestId, "decision_changed_to_rejected");
+      } else {
+        // re-approve => re-publish gatepass_public
+        await upsertPublicGatepass(requestId, { ...r, ...updates });
+      }
+
+      await refreshCache();
+      computeDashboardMetrics();
+      renderPendingRequests();
+      renderHistory();
+    }catch(e){
+      console.error(e);
+      alert("Unable to change decision. Check Firestore rules.");
+    }
+  }
+
+  // ===== Approve / Reject (Pending page) =====
   async function handleApprove(requestId){
     const r = cacheAllForApprover.find(x => x.id === requestId);
     if (!r) return;
@@ -1679,7 +1807,7 @@ textarea:focus{
 
     } else {
 
-      // ✅ WARDEN approvals are ALWAYS FINAL (forever)
+      // ✅ WARDEN approvals are ALWAYS FINAL
       if (holderRole === "warden") {
         updates.status = "approved_final";
         updates.current = { holder_email: null, holder_role: "", stage: "" };
@@ -1773,7 +1901,6 @@ textarea:focus{
       updates.status = "rejected_dean";
       updates.escalation = { ...(r.escalation || {}), dean_action: "rejected" };
     } else {
-      // ✅ warden reject = final reject at L1 level
       updates.status = "rejected_l1";
       updates.escalation = {
         ...(r.escalation || {}),
@@ -1784,6 +1911,9 @@ textarea:focus{
 
     try{
       await updateDoc(doc(db, "leave_requests", requestId), updates);
+
+      // If it was previously approved and gatepass exists => revoke it
+      await revokePublicGatepass(requestId, "rejected");
 
       await refreshCache();
       computeDashboardMetrics();
@@ -1843,7 +1973,8 @@ textarea:focus{
     repModeTime.classList.toggle("active", mode === "time");
     repModeStudent.classList.toggle("active", mode === "student");
     repRollBox.style.display = (mode === "student") ? "block" : "none";
-    clearToast(repToast);
+    repToast.className = "toast";
+    repToast.textContent = "";
   }
   repModeTime.addEventListener("click", () => setRepMode("time"));
   repModeStudent.addEventListener("click", () => setRepMode("student"));
@@ -1871,7 +2002,8 @@ textarea:focus{
     const from = addDays(now, -days);
     repFrom.value = dateToStr(from);
     repTo.value = todayDateStr();
-    clearToast(repToast);
+    repToast.className = "toast";
+    repToast.textContent = "";
   }
   repPreset7.addEventListener("click", () => applyPreset(7));
   repPreset30.addEventListener("click", () => applyPreset(30));
@@ -1880,7 +2012,8 @@ textarea:focus{
     const first = new Date(now.getFullYear(), now.getMonth(), 1);
     repFrom.value = dateToStr(first);
     repTo.value = todayDateStr();
-    clearToast(repToast);
+    repToast.className = "toast";
+    repToast.textContent = "";
   });
 
   repClear.addEventListener("click", () => {
@@ -1889,7 +2022,8 @@ textarea:focus{
     repYear.value = "all";
     repRoll.value = "";
     setRepMode("time");
-    clearToast(repToast);
+    repToast.className = "toast";
+    repToast.textContent = "";
   });
 
   async function fetchFinalApprovedRowsForReport({ fromDate, toDate, year, roll }){
@@ -1924,13 +2058,7 @@ textarea:focus{
       rows = rows.filter(r => normalizeRollno(r.student_rollno || "") === rr);
     }
 
-    rows.sort((a,b) => {
-      const aa = getInDT(a); const bb = getInDT(b);
-      const ad = typeof aa?.toDate === "function" ? aa.toDate() : new Date(aa);
-      const bd = typeof bb?.toDate === "function" ? bb.toDate() : new Date(bb);
-      return (ad?.getTime?.()||0) - (bd?.getTime?.()||0);
-    });
-
+    rows.sort((a,b) => (toJSDate(getInDT(a))?.getTime()||0) - (toJSDate(getInDT(b))?.getTime()||0));
     return rows;
   }
 
@@ -2040,7 +2168,8 @@ textarea:focus{
   }
 
   repDownload.addEventListener("click", async () => {
-    clearToast(repToast);
+    repToast.className = "toast";
+    repToast.textContent = "";
 
     try{
       repDownload.disabled = true;
@@ -2051,16 +2180,19 @@ textarea:focus{
       const roll = (repMode === "student") ? (repRoll.value || "") : "";
 
       if (repMode === "student" && !roll.trim()){
-        showToast(repToast, "Enter Student Roll No for Student-wise report.", "bad");
+        repToast.className = "toast show bad";
+        repToast.textContent = "Enter Student Roll No for Student-wise report.";
         return;
       }
 
-      showToast(repToast, "Preparing report…", "good");
+      repToast.className = "toast show good";
+      repToast.textContent = "Preparing report…";
 
       const rows = await fetchFinalApprovedRowsForReport({ fromDate, toDate, year, roll });
 
       if (!rows.length){
-        showToast(repToast, "No final approved records found for the selected filters.", "bad");
+        repToast.className = "toast show bad";
+        repToast.textContent = "No final approved records found for the selected filters.";
         return;
       }
 
@@ -2068,11 +2200,13 @@ textarea:focus{
       const filename = buildReportFilename({ mode: repMode, fromDate, toDate, roll });
 
       pdf.save(filename);
-      showToast(repToast, "Downloaded successfully ✅", "good");
+      repToast.className = "toast show good";
+      repToast.textContent = "Downloaded successfully ✅";
 
     }catch(err){
       console.error(err);
-      showToast(repToast, err?.message || "Unable to generate report. Check Firestore indexes / permissions.", "bad");
+      repToast.className = "toast show bad";
+      repToast.textContent = err?.message || "Unable to generate report. Check Firestore indexes / permissions.";
     }finally{
       repDownload.disabled = false;
     }
@@ -2127,4 +2261,3 @@ textarea:focus{
 </script>
 </body>
 </html>
-
