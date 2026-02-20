@@ -622,40 +622,51 @@
       if (a && b) return `${a} — ${b}`;
       return (b || a || "—");
     }
+function approvedByLine(r){
+  // prefer what we fetched from gatepasses
+  const fetched = String(r?.__approved_by || "").trim();
+  if (fetched) return fetched;
 
-    function approvedByLine(r){
-      const byEmail =
-        r?.final_approved_by_email ||
-        r?.approved_by_email ||
-        r?.approved_by ||
-        r?.finalApprovedByEmail ||
-        "";
-      const byRole =
-        r?.final_approved_by_role ||
-        r?.approved_by_role ||
-        r?.finalApprovedByRole ||
-        "";
-      const e = String(byEmail || "").trim();
-      const role = String(byRole || "").trim();
-      if (e && role) return `${e} (${role})`;
-      return (e || role || "—");
-    }
+  // fallback to any direct fields (if you later add them into gatepass_public)
+  const byEmail =
+    r?.final_approved_by_email ||
+    r?.approved_by_email ||
+    r?.approved_by ||
+    r?.finalApprovedByEmail ||
+    "";
+  const byRole =
+    r?.final_approved_by_role ||
+    r?.approved_by_role ||
+    r?.finalApprovedByRole ||
+    "";
 
-    async function tryFetchQrToken(leaveRequestId){
-      try{
-        const q = query(
-          collection(db, "gatepasses"),
-          where("leave_request_id", "==", leaveRequestId),
-          limit(1)
-        );
-        const snap = await getDocs(q);
-        if (snap.empty) return "";
-        const gp = snap.docs[0].data() || {};
-        return String(gp.qr_token || "").trim();
-      }catch(e){
-        return "";
-      }
-    }
+  const e = String(byEmail || "").trim();
+  const role = String(byRole || "").trim();
+  if (e && role) return `${e} (${role})`;
+  return (e || role || "—");
+}
+  
+
+   async function tryFetchApproverInfo(leaveRequestId){
+  try{
+    const q = query(
+      collection(db, "gatepasses"),
+      where("leave_request_id", "==", leaveRequestId),
+      limit(1)
+    );
+    const snap = await getDocs(q);
+    if (snap.empty) return "";
+
+    const gp = snap.docs[0].data() || {};
+    const email = String(gp.final_approved_by_email || "").trim();
+    const role  = String(gp.final_approved_by_role || "").trim();
+
+    if (email && role) return `${email} (${role})`;
+    return (email || role || "");
+  }catch(e){
+    return "";
+  }
+}
 
     /* ===================== RENDERS ===================== */
 
@@ -785,65 +796,60 @@
 
     // ✅ Public/QR scan view (minimal details)
     function renderPublicApprovedOnly(r){
-      const name = r.student_name || "—";
-      const roll = normalizeRoll(r.student_rollno || "");
-      const room = r.student_room_no || "—";
-      const by = approvedByLine(r);
+  const name = r.student_name || "—";
+  const roll = normalizeRoll(r.student_rollno || "");
+  const room = r.student_room_no || "—";
+  const by = approvedByLine(r);
+  const expired = !!r.__expired;
 
-      const expired = !!r.__expired;
-
-      const el = document.createElement("div");
-      el.innerHTML = `
-        <div class="gpTop">
-          <div class="gpStudent">
-            <img class="gpPhoto" alt="Student photo">
-            <div class="gpAvatar">${initials(name)}</div>
-            <div style="min-width:0">
-              <div class="gpName">${name}</div>
-              <div class="gpMeta">
-                <div><b>${roll || "—"}</b> • Room ${room || "—"}</div>
-                <div style="margin-top:6px;"><b>Approved by:</b> ${by}</div>
-              </div>
-            </div>
+  const el = document.createElement("div");
+  el.innerHTML = `
+    <div class="gpTop">
+      <div class="gpStudent">
+        <img class="gpPhoto" alt="Student photo">
+        <div class="gpAvatar">${initials(name)}</div>
+        <div style="min-width:0">
+          <div class="gpName">${name}</div>
+          <div class="gpMeta">
+            <div><b>${roll || "—"}</b> • Room ${room || "—"}</div>
+            <div style="margin-top:6px;"><b>Approved by:</b> ${by || "—"}</div>
           </div>
         </div>
+      </div>
+    </div>
 
-        <div class="bottom">
-          <div class="stampWrap">
-            <div class="stampBig ${expired ? "expired" : ""}">${expired ? "EXPIRED" : "APPROVED"}</div>
-            <div class="stampNote">
-              This QR is only for verification.<br>
-              If approved, student can be allowed.
-            </div>
-          </div>
-
-          <div>
-            <div class="qrWrap"><div id="qrHere"></div></div>
-            <div class="qrHint">Scan to open Gatepass</div>
-          </div>
+    <div class="bottom">
+      <div class="stampWrap">
+        <div class="stampBig ${expired ? "expired" : ""}">${expired ? "EXPIRED" : "APPROVED"}</div>
+        <div class="stampNote">
+          QR verification page (security view).<br>
+          No extra details shown.
         </div>
-      `;
+      </div>
+    </div>
+  `;
 
-      mount.innerHTML = "";
-      mount.appendChild(el);
+  mount.innerHTML = "";
+  mount.appendChild(el);
 
-      const img = el.querySelector(".gpPhoto");
-      const av = el.querySelector(".gpAvatar");
-      const { primary, fallback } = resolvePhotoURL(r);
+  const img = el.querySelector(".gpPhoto");
+  const av = el.querySelector(".gpAvatar");
+  const { primary, fallback } = resolvePhotoURL(r);
 
-      av.style.display = "grid";
-      img.style.display = "none";
+  av.style.display = "grid";
+  img.style.display = "none";
 
-      if (primary){
-        let usedFallback = false;
-        img.referrerPolicy = "no-referrer";
-        img.onload = () => { img.style.display="block"; av.style.display="none"; };
-        img.onerror = () => {
-          if (!usedFallback && fallback){ usedFallback = true; img.src = fallback; return; }
-          img.style.display="none"; av.style.display="grid";
-        };
-        img.src = primary;
-      }
+  if (primary){
+    let usedFallback = false;
+    img.referrerPolicy = "no-referrer";
+    img.onload = () => { img.style.display="block"; av.style.display="none"; };
+    img.onerror = () => {
+      if (!usedFallback && fallback){ usedFallback = true; img.src = fallback; return; }
+      img.style.display="none"; av.style.display="grid";
+    };
+    img.src = primary;
+  }
+}
 
       const link = buildQrLink(r.id);
       const qrEl = document.getElementById("qrHere");
@@ -971,7 +977,8 @@
 
       // Fetch qr_token from gatepasses (best effort)
       gp.__qr_token = await tryFetchQrToken(id);
-
+      gp.__approved_by = await tryFetchApproverInfo(id);
+      
       // ✅ PUBLIC VIEW (security QR scan)
       if (!u){
         logoutBtn.style.display = "none";
@@ -1008,3 +1015,4 @@
   </script>
 </body>
 </html>
+
