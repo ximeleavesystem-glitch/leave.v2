@@ -1334,8 +1334,10 @@ textarea:focus{
 
       const arrivalLine = computeArrivalStatusLine(r);
 
-      const holderRole = getCurrentHolderRole(r).toLowerCase();
-      const canEscalate = (holderRole === "batch_coordinator" || holderRole === "warden") && !!(r.routing && r.routing.dean_email);
+     const holderRole = getCurrentHolderRole(r).toLowerCase();
+
+// ✅ ONLY Batch Coordinator can escalate (warden cannot)
+const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.routing.dean_email);
 
       const remarkId = `remark_${r.id}`;
       const escId = `esc_${r.id}`;
@@ -1643,35 +1645,59 @@ textarea:focus{
 
       updates.escalation = { ...(r.escalation || {}), dean_action: "approved" };
       finalApproved = true;
+   } else {
+
+  // ✅ WARDEN approvals are ALWAYS FINAL (forever)
+  if (holderRole === "warden") {
+    updates.status = "approved_final";
+    updates.current = { holder_email: null, holder_role: "", stage: "" };
+    updates.current_holder_email = null;
+
+    updates.escalation = {
+      ...(r.escalation || {}),
+      requested: false,
+      dean_action: "not_required"
+    };
+
+    finalApproved = true;
+
+  } else {
+    // ✅ Batch Coordinator can still escalate optionally (if you want)
+    const deanEmail = r?.routing?.dean_email || "";
+    const escEl = document.getElementById(`esc_${requestId}`);
+    const wantEsc = !!(escEl && escEl.checked);
+
+    if (wantEsc && deanEmail){
+      chain = ensureDeanStage(chain, deanEmail);
+      updates.approver_chain = chain;
+
+      updates.status = "pending_dean";
+      updates.current = { holder_email: normalizeEmail(deanEmail), holder_role: "dean", stage: "DEAN" };
+      updates.current_holder_email = normalizeEmail(deanEmail);
+
+      updates.escalation = {
+        ...(r.escalation || {}),
+        requested: true,
+        requested_by: currentUserEmailLower,
+        requested_at: serverTimestamp(),
+        reason: ""
+      };
+
     } else {
-      const deanEmail = r?.routing?.dean_email || "";
-      const escEl = document.getElementById(`esc_${requestId}`);
-      const wantEsc = !!(escEl && escEl.checked);
+      updates.status = "approved_final";
+      updates.current = { holder_email: null, holder_role: "", stage: "" };
+      updates.current_holder_email = null;
 
-      if (wantEsc && deanEmail){
-        chain = ensureDeanStage(chain, deanEmail);
-        updates.approver_chain = chain;
-        updates.status = "pending_dean";
-        updates.current = { holder_email: normalizeEmail(deanEmail), holder_role: "dean", stage: "DEAN" };
-        updates.current_holder_email = normalizeEmail(deanEmail);
+      updates.escalation = {
+        ...(r.escalation || {}),
+        requested: false,
+        dean_action: "not_required"
+      };
 
-        updates.escalation = {
-          ...(r.escalation || {}),
-          requested: true,
-          requested_by: currentUserEmailLower,
-          requested_at: serverTimestamp(),
-          reason: ""
-        };
-      } else {
-        updates.status = "approved_final";
-        updates.current = { holder_email: null, holder_role: "", stage: "" };
-        updates.current_holder_email = null;
-
-        updates.escalation = { ...(r.escalation || {}), requested: false, dean_action: "not_required" };
-        finalApproved = true;
-      }
+      finalApproved = true;
     }
-
+  }
+}
     try{
       await updateDoc(doc(db, "leave_requests", requestId), updates);
 
@@ -1713,10 +1739,17 @@ textarea:focus{
     if (holderRole === "dean" || st === "pending_dean"){
       updates.status = "rejected_dean";
       updates.escalation = { ...(r.escalation || {}), dean_action: "rejected" };
-    } else {
-      updates.status = "rejected_l1";
-      updates.escalation = { ...(r.escalation || {}), dean_action: r?.escalation?.requested ? "pending" : "not_required" };
-    }
+  } else {
+
+  // ✅ warden reject = final reject at L1 level
+  updates.status = "rejected_l1";
+
+  updates.escalation = {
+    ...(r.escalation || {}),
+    requested: false,
+    dean_action: "not_required"
+  };
+}
 
     try{
       await updateDoc(doc(db, "leave_requests", requestId), updates);
@@ -2117,3 +2150,4 @@ textarea:focus{
 </script>
 </body>
 </html>
+
