@@ -927,31 +927,53 @@ textarea:focus{
     return true;
   }
 
-  // schema-safe getters
-  function getOutDT(r){ return r.out_datetime || r.outDT || r.outDateTime || ""; }
-  function getInDT(r){ return r.in_datetime || r.inDT || r.inDateTime || ""; }
-  function getArrivalVerified(r){ return !!(r.arrival && r.arrival.verified); }
-  function getActualIn(r){ return (r.arrival && r.arrival.actual_in_time) ? r.arrival.actual_in_time : ""; }
-  function getLateMinutes(r){
-    const v = r.arrival && (r.arrival.late_minutes ?? r.arrival.lateMinutes);
-    if (v === null || v === undefined) return null;
-    const n = Number(v);
-    return Number.isFinite(n) ? n : null;
+  function toISO(value){
+  if (!value) return "";
+  // Firestore Timestamp (has toDate)
+  if (typeof value === "object" && typeof value.toDate === "function"){
+    return value.toDate().toISOString();
   }
+  // Firestore Timestamp (plain object {seconds, nanoseconds})
+  if (typeof value === "object" && typeof value.seconds === "number"){
+    return new Date(value.seconds * 1000).toISOString();
+  }
+  // JS Date
+  if (value instanceof Date){
+    return value.toISOString();
+  }
+  // String
+  if (typeof value === "string"){
+    const d = new Date(value);
+    return isNaN(d) ? "" : d.toISOString();
+  }
+  return "";
+}
 
-  function fmtDT(iso){
-    const dt = new Date(iso);
-    if (isNaN(dt)) return "-";
-    const dd = String(dt.getDate()).padStart(2,"0");
-    const mm = String(dt.getMonth()+1).padStart(2,"0");
-    const yyyy = dt.getFullYear();
-    let hh = dt.getHours();
-    const min = String(dt.getMinutes()).padStart(2,"0");
-    const ampm = hh >= 12 ? "PM" : "AM";
-    hh = hh % 12; hh = hh ? hh : 12;
-    hh = String(hh).padStart(2,"0");
-    return `${dd}/${mm}/${yyyy} ${hh}:${min} ${ampm}`;
-  }
+function getOutDT(r){
+  return toISO(r.out_datetime || r.outDT || r.outDateTime || "");
+}
+function getInDT(r){
+  return toISO(r.in_datetime || r.inDT || r.inDateTime || "");
+}
+function getActualIn(r){
+  return toISO((r.arrival && r.arrival.actual_in_time) ? r.arrival.actual_in_time : "");
+}
+
+function fmtDT(iso){
+  const v = toISO(iso);
+  if (!v) return "-";
+  const dt = new Date(v);
+  if (isNaN(dt)) return "-";
+  const dd = String(dt.getDate()).padStart(2,"0");
+  const mm = String(dt.getMonth()+1).padStart(2,"0");
+  const yyyy = dt.getFullYear();
+  let hh = dt.getHours();
+  const min = String(dt.getMinutes()).padStart(2,"0");
+  const ampm = hh >= 12 ? "PM" : "AM";
+  hh = hh % 12; hh = hh ? hh : 12;
+  hh = String(hh).padStart(2,"0");
+  return `${dd}/${mm}/${yyyy} ${hh}:${min} ${ampm}`;
+}
 
   function initials(name){
     const n = String(name || "").trim();
@@ -1143,7 +1165,7 @@ textarea:focus{
     const roll = r.student_rollno || "—";
     const email = r.student_email || "—";
     const room = r.student_room_no || "—";
-    const reason = r.reason_text || r.reason || "-";
+const reason = r.reason_text || r.reason || r.reasonText || "-";
     const outVal = getOutDT(r) || "";
     const inVal = getInDT(r) || "";
 
@@ -1917,3 +1939,4 @@ textarea:focus{
 </script>
 </body>
 </html>
+
