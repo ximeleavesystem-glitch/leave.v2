@@ -522,7 +522,8 @@ textarea:focus{
         <div class="panelBody">
           <div class="reportIntro">
             Download PDF for <b>Final Approved</b> requests that were <b>approved by you</b> at your stage.
-            Includes <b>Actual In Time</b> + <b>Late By</b> and also a <b>Late Comers</b> list.
+            Report shows <b>Arrival Status</b> (Blank if IN not crossed, Not yet reached if IN crossed but not verified,
+            and Late/On time/Before time if verified).
           </div>
 
           <div class="pills">
@@ -595,7 +596,6 @@ textarea:focus{
   <!-- HISTORY -->
   <section id="pageHistory" class="hidden">
 
-    <!-- Dean-style filters (History + Intimation) -->
     <div class="panel" style="margin-bottom:12px;">
       <div class="panelHead">
         <h3 class="panelTitle">Filters</h3>
@@ -921,56 +921,56 @@ textarea:focus{
     if (r === 0) return `${h}h`;
     return `${h}h ${r}m`;
   }
+
+  // --- Arrival Status helpers for PDF ---
   function minutesToHM(mins){
-  const m = Math.max(0, Math.floor(Number(mins) || 0));
-  const h = Math.floor(m / 60);
-  const r = m % 60;
-  if (h <= 0) return `${r}m`;
-  if (r === 0) return `${h}h`;
-  return `${h}h ${r}m`;
-}
+    const m = Math.max(0, Math.floor(Number(mins) || 0));
+    const h = Math.floor(m / 60);
+    const r = m % 60;
+    if (h <= 0) return `${r}m`;
+    if (r === 0) return `${h}h`;
+    return `${h}h ${r}m`;
+  }
 
-function getArrivalStatusText(row){
-  // planned IN
-  const plannedInVal = getInDT(row);
-  let plannedIn = null;
+  function getArrivalStatusText(row){
+    const plannedInVal = getInDT(row);
+    let plannedIn = null;
 
-  if (plannedInVal && typeof plannedInVal?.toDate === "function") plannedIn = plannedInVal.toDate();
-  else plannedIn = plannedInVal ? new Date(String(plannedInVal)) : null;
+    if (plannedInVal && typeof plannedInVal?.toDate === "function") plannedIn = plannedInVal.toDate();
+    else plannedIn = plannedInVal ? new Date(String(plannedInVal)) : null;
 
-  if (!plannedIn || isNaN(plannedIn)) return "";
+    if (!plannedIn || isNaN(plannedIn)) return "";
 
-  const now = new Date();
+    const now = new Date();
 
-  // Rule 1: if IN time not crossed => blank
-  if (now < plannedIn) return "";
+    // IN time not crossed => blank
+    if (now < plannedIn) return "";
 
-  const arrival = row.arrival || {};
-  const verified = !!arrival.verified;
+    const arrival = row.arrival || {};
+    const verified = !!arrival.verified;
 
-  // Rule 2: IN time crossed but not verified
-  if (!verified) return "Not yet reached";
+    // IN crossed but not verified
+    if (!verified) return "Not yet reached";
 
-  // actual in time
-  const actualVal =
-    arrival.actual_in_time ||
-    arrival.actual_in_datetime ||
-    arrival.verified_at ||
-    arrival.verifiedAt ||
-    null;
+    const actualVal =
+      arrival.actual_in_time ||
+      arrival.actual_in_datetime ||
+      arrival.verified_at ||
+      arrival.verifiedAt ||
+      null;
 
-  let actualIn = null;
-  if (actualVal && typeof actualVal?.toDate === "function") actualIn = actualVal.toDate();
-  else actualIn = actualVal ? new Date(String(actualVal)) : null;
+    let actualIn = null;
+    if (actualVal && typeof actualVal?.toDate === "function") actualIn = actualVal.toDate();
+    else actualIn = actualVal ? new Date(String(actualVal)) : null;
 
-  if (!actualIn || isNaN(actualIn)) return "Reached";
+    if (!actualIn || isNaN(actualIn)) return "Reached";
 
-  const diffMins = Math.round((actualIn.getTime() - plannedIn.getTime()) / 60000);
+    const diffMins = Math.round((actualIn.getTime() - plannedIn.getTime()) / 60000);
 
-  if (diffMins > 0) return `Late by ${minutesToHM(diffMins)}`;
-  if (diffMins === 0) return "On time";
-  return `Before time by ${minutesToHM(Math.abs(diffMins))}`;
-}
+    if (diffMins > 0) return `Late by ${minutesToHM(diffMins)}`;
+    if (diffMins === 0) return "On time";
+    return `Before time by ${minutesToHM(Math.abs(diffMins))}`;
+  }
 
   function isFinalApprovedStatus(st){
     const s = String(st || "").toLowerCase();
@@ -1014,12 +1014,10 @@ function getArrivalStatusText(row){
   }
 
   function computeArrivalStatusLine(row){
-    // Always show meaningful status on History cards.
     const arrival = row.arrival || {};
     const verified = !!arrival.verified;
     const lateMinutes = arrival.late_minutes ?? arrival.lateMinutes;
 
-    // If final approved but not verified
     if (isFinalApprovedStatus(row.status)){
       if (!verified){
         return "⚠️ Arrival: NOT VERIFIED (Student has not entered / not verified)";
@@ -1032,14 +1030,13 @@ function getArrivalStatusText(row){
       return `✅ Arrival: VERIFIED • ${lateTxt} • at ${atTxt}`;
     }
 
-    // For non-final statuses (pending/rejected), we keep it minimal
     if (verified){
       const lateTxt = (lateMinutes != null && Number(lateMinutes) > 0)
         ? `Late by ${formatLateMinutes(lateMinutes)}`
         : "On time";
       return `✅ Arrival: VERIFIED • ${lateTxt}`;
     }
-    return ""; // don't clutter pending/rejected
+    return "";
   }
 
   function isLateRow(row){
@@ -1057,9 +1054,7 @@ function getArrivalStatusText(row){
 
   function isWeekendReason(row){
     const rc = getReasonCat(row);
-    // new student UI uses weekend_leave
     if (rc === "weekend_leave") return true;
-    // legacy safety
     if (rc === "weekend" || rc === "weekend leave") return true;
     return false;
   }
@@ -1111,7 +1106,6 @@ function getArrivalStatusText(row){
       lineBC.style.display = "none";
     }
 
-    // Intimation tab is only for BC
     if (canBC){
       hIntimation.classList.remove("hidden");
     } else {
@@ -1259,7 +1253,6 @@ function getArrivalStatusText(row){
     const meLower = currentUserEmailLower;
     const meRaw = currentUserEmailRaw;
 
-    // Pending assigned to me
     const qHoldLower = query(collection(db, "leave_requests"), where("current_holder_email", "==", meLower));
     const qHoldRaw   = query(collection(db, "leave_requests"), where("current_holder_email", "==", meRaw));
 
@@ -1269,7 +1262,6 @@ function getArrivalStatusText(row){
       return st === "pending_l1" || st === "pending_dean";
     });
 
-    // History for me (acted or escalated)
     const qMineLower = query(collection(db, "leave_requests"), where("approver_emails", "array-contains", meLower));
     const qMineRaw   = query(collection(db, "leave_requests"), where("approver_emails", "array-contains", meRaw));
 
@@ -1288,13 +1280,9 @@ function getArrivalStatusText(row){
     [...pendingRows, ...actedOrEscalated].forEach(r => map.set(r.id, r));
     cacheAllForApprover = [...map.values()];
 
-    // BC Intimation cache: warden-approved final requests in BC year scope
     cacheIntimationForBC = [];
     if (canBC && bcYears.length){
       const years = bcYears.filter(y => y === "1" || y === "2");
-
-      // We can’t do "routing.l1_role == warden" + year IN + status IN in a single query reliably without indexes,
-      // so we do a safer approach: query final statuses and filter in JS.
       try{
         const qFinal = query(
           collection(db, "leave_requests"),
@@ -1305,10 +1293,8 @@ function getArrivalStatusText(row){
 
         rows = rows.filter(r => String(r?.routing?.l1_role || "").toLowerCase() === "warden");
         rows = rows.filter(r => years.includes(String(getStudentYear(r))));
-        // optional: date range from dashboard filter (out datetime)
         rows = rows.filter(r => inDateRangeOutDT(r, dashFrom, dashTo));
 
-        // newest first
         rows.sort((a,b) => {
           const aa = getOutDT(a); const bb = getOutDT(b);
           const ad = typeof aa?.toDate === "function" ? aa.toDate() : new Date(aa);
@@ -1318,8 +1304,6 @@ function getArrivalStatusText(row){
 
         cacheIntimationForBC = rows;
       }catch(e){
-        // If "in" query requires index or blocked by rules, we fallback to a broader fetch via year scope if possible.
-        // (Keeping it silent — UI will still work from primary cache if any.)
         cacheIntimationForBC = [];
       }
     }
@@ -1384,10 +1368,10 @@ function getArrivalStatusText(row){
 
       const arrivalLine = computeArrivalStatusLine(r);
 
-     const holderRole = getCurrentHolderRole(r).toLowerCase();
+      const holderRole = getCurrentHolderRole(r).toLowerCase();
 
-// ✅ ONLY Batch Coordinator can escalate (warden cannot)
-const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.routing.dean_email);
+      // ONLY Batch Coordinator can escalate (warden cannot)
+      const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.routing.dean_email);
 
       const remarkId = `remark_${r.id}`;
       const escId = `esc_${r.id}`;
@@ -1508,10 +1492,8 @@ const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.ro
       }
     }
 
-    // Apply dean-style filters to BOTH history & intimation
     rows = applyHistoryFilters(rows);
 
-    // Sort newest out first
     rows.sort((a,b) => {
       const aa = getOutDT(a); const bb = getOutDT(b);
       const ad = typeof aa?.toDate === "function" ? aa.toDate() : new Date(aa);
@@ -1520,7 +1502,6 @@ const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.ro
     });
 
     updateHistoryCounts();
-
     historyContainer.innerHTML = "";
 
     if (!rows.length){
@@ -1613,7 +1594,7 @@ const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.ro
     await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
   }
 
-  // ===== Approve / Reject (your existing logic) =====
+  // ===== Approve / Reject =====
   function ensureDeanStage(chain, deanEmail){
     const arr = Array.isArray(chain) ? [...chain] : [];
     const exists = arr.some(x => String(x?.role || "").toLowerCase() === "dean");
@@ -1695,59 +1676,61 @@ const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.ro
 
       updates.escalation = { ...(r.escalation || {}), dean_action: "approved" };
       finalApproved = true;
-   } else {
-
-  // ✅ WARDEN approvals are ALWAYS FINAL (forever)
-  if (holderRole === "warden") {
-    updates.status = "approved_final";
-    updates.current = { holder_email: null, holder_role: "", stage: "" };
-    updates.current_holder_email = null;
-
-    updates.escalation = {
-      ...(r.escalation || {}),
-      requested: false,
-      dean_action: "not_required"
-    };
-
-    finalApproved = true;
-
-  } else {
-    // ✅ Batch Coordinator can still escalate optionally (if you want)
-    const deanEmail = r?.routing?.dean_email || "";
-    const escEl = document.getElementById(`esc_${requestId}`);
-    const wantEsc = !!(escEl && escEl.checked);
-
-    if (wantEsc && deanEmail){
-      chain = ensureDeanStage(chain, deanEmail);
-      updates.approver_chain = chain;
-
-      updates.status = "pending_dean";
-      updates.current = { holder_email: normalizeEmail(deanEmail), holder_role: "dean", stage: "DEAN" };
-      updates.current_holder_email = normalizeEmail(deanEmail);
-
-      updates.escalation = {
-        ...(r.escalation || {}),
-        requested: true,
-        requested_by: currentUserEmailLower,
-        requested_at: serverTimestamp(),
-        reason: ""
-      };
 
     } else {
-      updates.status = "approved_final";
-      updates.current = { holder_email: null, holder_role: "", stage: "" };
-      updates.current_holder_email = null;
 
-      updates.escalation = {
-        ...(r.escalation || {}),
-        requested: false,
-        dean_action: "not_required"
-      };
+      // ✅ WARDEN approvals are ALWAYS FINAL (forever)
+      if (holderRole === "warden") {
+        updates.status = "approved_final";
+        updates.current = { holder_email: null, holder_role: "", stage: "" };
+        updates.current_holder_email = null;
 
-      finalApproved = true;
+        updates.escalation = {
+          ...(r.escalation || {}),
+          requested: false,
+          dean_action: "not_required"
+        };
+
+        finalApproved = true;
+
+      } else {
+        // ✅ Batch Coordinator can still escalate optionally
+        const deanEmail = r?.routing?.dean_email || "";
+        const escEl = document.getElementById(`esc_${requestId}`);
+        const wantEsc = !!(escEl && escEl.checked);
+
+        if (wantEsc && deanEmail){
+          chain = ensureDeanStage(chain, deanEmail);
+          updates.approver_chain = chain;
+
+          updates.status = "pending_dean";
+          updates.current = { holder_email: normalizeEmail(deanEmail), holder_role: "dean", stage: "DEAN" };
+          updates.current_holder_email = normalizeEmail(deanEmail);
+
+          updates.escalation = {
+            ...(r.escalation || {}),
+            requested: true,
+            requested_by: currentUserEmailLower,
+            requested_at: serverTimestamp(),
+            reason: ""
+          };
+
+        } else {
+          updates.status = "approved_final";
+          updates.current = { holder_email: null, holder_role: "", stage: "" };
+          updates.current_holder_email = null;
+
+          updates.escalation = {
+            ...(r.escalation || {}),
+            requested: false,
+            dean_action: "not_required"
+          };
+
+          finalApproved = true;
+        }
+      }
     }
-  }
-}
+
     try{
       await updateDoc(doc(db, "leave_requests", requestId), updates);
 
@@ -1789,17 +1772,15 @@ const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.ro
     if (holderRole === "dean" || st === "pending_dean"){
       updates.status = "rejected_dean";
       updates.escalation = { ...(r.escalation || {}), dean_action: "rejected" };
-  } else {
-
-  // ✅ warden reject = final reject at L1 level
-  updates.status = "rejected_l1";
-
-  updates.escalation = {
-    ...(r.escalation || {}),
-    requested: false,
-    dean_action: "not_required"
-  };
-}
+    } else {
+      // ✅ warden reject = final reject at L1 level
+      updates.status = "rejected_l1";
+      updates.escalation = {
+        ...(r.escalation || {}),
+        requested: false,
+        dean_action: "not_required"
+      };
+    }
 
     try{
       await updateDoc(doc(db, "leave_requests", requestId), updates);
@@ -1821,14 +1802,8 @@ const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.ro
   });
 
   tabDashboard.addEventListener("click", () => showPage("dashboard"));
-  tabRequests.addEventListener("click", () => {
-    showPage("requests");
-    renderPendingRequests();
-  });
-  tabHistory.addEventListener("click", () => {
-    showPage("history");
-    renderHistory();
-  });
+  tabRequests.addEventListener("click", () => { showPage("requests"); renderPendingRequests(); });
+  tabHistory.addEventListener("click", () => { showPage("history"); renderHistory(); });
 
   applyFilters.addEventListener("click", async () => {
     dashFrom = fFrom.value || "";
@@ -1844,13 +1819,11 @@ const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.ro
     renderPendingRequests();
   });
 
-  // History tab events
   hApproved.addEventListener("click", () => setHistoryTab("approved"));
   hRejected.addEventListener("click", () => setHistoryTab("rejected"));
   hEscalated.addEventListener("click", () => setHistoryTab("escalated"));
   hIntimation.addEventListener("click", () => setHistoryTab("intimation"));
 
-  // History filters
   hApplyFilters.addEventListener("click", () => renderHistory());
   hClearFilters.addEventListener("click", () => {
     hFrom.value = "";
@@ -1925,8 +1898,6 @@ const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.ro
     const { start, end } = dateRangeToTimestamps(fromDate, toDate);
     if (!start || !end) throw new Error("Invalid date range.");
 
-    // IMPORTANT FIX: in_datetime is Timestamp, so query must use Timestamp range (not strings).
-    // Also: your previous code used array-contains meLower only; we keep fallback to raw.
     const qLower = query(
       collection(db, "leave_requests"),
       where("approver_emails", "array-contains", currentUserEmailLower),
@@ -1953,7 +1924,6 @@ const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.ro
       rows = rows.filter(r => normalizeRollno(r.student_rollno || "") === rr);
     }
 
-    // sort by IN time
     rows.sort((a,b) => {
       const aa = getInDT(a); const bb = getInDT(b);
       const ad = typeof aa?.toDate === "function" ? aa.toDate() : new Date(aa);
@@ -2007,50 +1977,49 @@ const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.ro
     let y = 92;
     lines.forEach((t) => { docPDF.text(t, 40, y); y += 14; });
 
-    const lateRows = rows.filter(r => isLateRow(r));
+    docPDF.setFont("helvetica", "bold");
+    docPDF.text(`Total Records: ${rows.length}`, 40, y + 6);
+    docPDF.setFont("helvetica", "normal");
 
-   docPDF.setFont("helvetica", "bold");
-docPDF.text(`Total Records: ${rows.length}`, 40, y + 6);
-docPDF.setFont("helvetica", "normal");
-   const tableBody = rows.map((r, idx) => {
-  const studentName = r.student_name || "";
-  const rollno = normalizeRollno(r.student_rollno || "");
-  const yearVal = getStudentYear(r) || "";
-  const hostel = String(r.student_hostel || "").trim();
-  const room = String(r.student_room_no || "").trim();
-  const outVal = getOutDT(r);
-  const inVal  = getInDT(r);
-  const contact = String(r.contact_no || "").trim();
+    const tableBody = rows.map((r, idx) => {
+      const studentName = r.student_name || "";
+      const rollno = normalizeRollno(r.student_rollno || "");
+      const yearVal = getStudentYear(r) || "";
+      const hostel = String(r.student_hostel || "").trim();
+      const room = String(r.student_room_no || "").trim();
+      const outVal = getOutDT(r);
+      const inVal  = getInDT(r);
+      const contact = String(r.contact_no || "").trim();
 
-  const arrivalStatus = getArrivalStatusText(r);
+      const arrivalStatus = getArrivalStatusText(r);
 
-  const reasonCat = String(r.reason_category || "—").trim();
-  const reasonTxt = String(r.reason_text || r.reason || "").trim();
-  const reason = reasonTxt ? `${reasonCat} — ${reasonTxt}` : reasonCat;
+      const reasonCat = String(r.reason_category || "—").trim();
+      const reasonTxt = String(r.reason_text || r.reason || "").trim();
+      const reason = reasonTxt ? `${reasonCat} — ${reasonTxt}` : reasonCat;
 
-  return [
-    String(idx + 1),
-    rollno || "—",
-    studentName || "—",
-    yearVal || "—",
-    hostel || "—",
-    room || "—",
-    fmtDT(outVal),
-    fmtDT(inVal),
-    arrivalStatus,
-    contact || "—",
-    reason || "—"
-  ];
-});
+      return [
+        String(idx + 1),
+        rollno || "—",
+        studentName || "—",
+        yearVal || "—",
+        hostel || "—",
+        room || "—",
+        fmtDT(outVal),
+        fmtDT(inVal),
+        arrivalStatus,
+        contact || "—",
+        reason || "—"
+      ];
+    });
 
     docPDF.autoTable({
       startY: y + 18,
-    head: [[
-  "S.No","Roll No","Student Name","Year","Hostel","Room",
-  "Out Date & Time","In Date & Time",
-  "Arrival Status",
-  "Contact","Reason"
-]],
+      head: [[
+        "S.No","Roll No","Student Name","Year","Hostel","Room",
+        "Out Date & Time","In Date & Time",
+        "Arrival Status",
+        "Contact","Reason"
+      ]],
       body: tableBody,
       styles: { font: "helvetica", fontSize: 8, cellPadding: 4, overflow: "linebreak" },
       headStyles: { fillColor: [193, 18, 31], textColor: 255, fontStyle: "bold" },
@@ -2066,18 +2035,6 @@ docPDF.setFont("helvetica", "normal");
         docPDF.setTextColor(15, 23, 42);
       }
     });
-
-      docPDF.autoTable({
-        startY: 70,
-        head: [["S.No","Roll No","Student Name","Planned In Time","Actual In Time","Late By"]],
-        body: body2,
-        styles: { font: "helvetica", fontSize: 9, cellPadding: 5, overflow: "linebreak" },
-        headStyles: { fillColor: [193, 18, 31], textColor: 255, fontStyle: "bold" },
-        alternateRowStyles: { fillColor: [248, 250, 252] },
-        margin: { left: 40, right: 40 },
-        theme: "striped"
-      });
-    }
 
     return docPDF;
   }
@@ -2170,5 +2127,3 @@ docPDF.setFont("helvetica", "normal");
 </script>
 </body>
 </html>
-
-
