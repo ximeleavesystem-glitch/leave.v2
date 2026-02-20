@@ -343,6 +343,14 @@
         0 10px 24px rgba(15,118,110,.10),
         inset 0 0 0 2px rgba(15,118,110,.14);
     }
+    .stampBig.expired{
+      border-color: rgba(180,35,24,.55);
+      color:#b42318;
+      background: rgba(180,35,24,.04);
+      box-shadow:
+        0 10px 24px rgba(180,35,24,.10),
+        inset 0 0 0 2px rgba(180,35,24,.14);
+    }
     .stampBig::before{
       content:"";
       position:absolute;
@@ -352,21 +360,8 @@
       transform: rotate(0.9deg);
       pointer-events:none;
     }
-    .stampBig::after{
-      content:"";
-      position:absolute;
-      inset:-6px;
-      border-radius:18px;
-      background:
-        radial-gradient(circle at 10% 30%, rgba(15,118,110,.22) 0 2px, transparent 3px),
-        radial-gradient(circle at 30% 70%, rgba(15,118,110,.18) 0 2px, transparent 3px),
-        radial-gradient(circle at 80% 30%, rgba(15,118,110,.16) 0 2px, transparent 3px),
-        radial-gradient(circle at 65% 80%, rgba(15,118,110,.20) 0 2px, transparent 3px),
-        repeating-linear-gradient(135deg, rgba(15,118,110,.05) 0 2px, transparent 2px 6px);
-      mix-blend-mode:multiply;
-      opacity:.35;
-      filter: blur(.2px);
-      pointer-events:none;
+    .stampBig.expired::before{
+      border-color: rgba(180,35,24,.30);
     }
 
     .stampNote{
@@ -434,7 +429,10 @@
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-    import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+    import {
+      getFirestore, doc, getDoc,
+      collection, getDocs, query, where, limit
+    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
     // ✅ bfcache fix (back button after logout)
     window.addEventListener("pageshow", (e) => {
@@ -478,10 +476,11 @@
     function normalizeEmail(v){ return String(v || "").trim().toLowerCase(); }
     function normalizeRoll(v){ return String(v || "").trim().toUpperCase(); }
 
+    // ✅ Timestamp/Date/string safe
     function toJSDate(x){
       if (!x) return null;
       if (x instanceof Date) return x;
-      if (typeof x?.toDate === "function") return x.toDate();
+      if (typeof x?.toDate === "function") return x.toDate();          // Firestore Timestamp
       if (typeof x?.toMillis === "function") return new Date(x.toMillis());
       const d = new Date(x);
       return isNaN(d) ? null : d;
@@ -571,12 +570,53 @@
       return u.searchParams.get("id") || "";
     }
 
-    // ✅ expired = NOW > IN datetime
+    // ✅ expired = NOW > planned IN time
     function isExpiredFromData(data){
-      const inIso = data?.in_datetime || data?.inDT || "";
-      const inD = new Date(inIso);
-      if (!inIso || isNaN(inD)) return false;
+      const inVal =
+        data?.in_datetime ??
+        data?.in_datetime_ts ??
+        data?.inDT ??
+        data?.inDateTime ??
+        data?.in_datetime_iso ??
+        null;
+
+      const inD = toJSDate(inVal);
+      if (!inD) return false;
       return new Date() > inD;
+    }
+
+    function buildReasonLine(r){
+      // gatepass_public screenshot uses "reason"
+      const reason =
+        (r?.reason != null ? String(r.reason) : "") ||
+        (r?.reason_text != null ? String(r.reason_text) : "") ||
+        (r?.reasonText != null ? String(r.reasonText) : "") ||
+        "";
+      const cat =
+        (r?.reason_category != null ? String(r.reason_category) : "") ||
+        (r?.reasonCategory != null ? String(r.reasonCategory) : "") ||
+        "";
+      const a = cat.trim();
+      const b = reason.trim();
+      if (a && b) return `${a} — ${b}`;
+      return (b || a || "—");
+    }
+
+    async function tryFetchQrToken(leaveRequestId){
+      try{
+        const q = query(
+          collection(db, "gatepasses"),
+          where("leave_request_id", "==", leaveRequestId),
+          limit(1)
+        );
+        const snap = await getDocs(q);
+        if (snap.empty) return "";
+        const gp = snap.docs[0].data() || {};
+        return String(gp.qr_token || "").trim();
+      }catch(e){
+        // If rules don’t allow or index missing, we just don’t show token
+        return "";
+      }
     }
 
     function renderGatepass(r){
@@ -584,13 +624,17 @@
       const roll = normalizeRoll(r.student_rollno || "");
       const room = r.student_room_no || "—";
 
-      const outVal = r.out_datetime || r.outDT || "";
-      const inVal  = r.in_datetime || r.inDT || "";
+      const outVal = r.out_datetime ?? r.outDT ?? r.out_datetime_ts ?? r.outDateTime ?? "";
+      const inVal  = r.in_datetime ?? r.inDT ?? r.in_datetime_ts ?? r.inDateTime ?? "";
 
       const outDate = fmtDateOnly(outVal);
       const outTime = fmtTimeOnly(outVal);
       const inDate  = fmtDateOnly(inVal);
       const inTime  = fmtTimeOnly(inVal);
+
+      const expired = !!r.__expired;
+      const qrToken = String(r.__qr_token || "").trim();
+      const reasonLine = buildReasonLine(r);
 
       const el = document.createElement("div");
 
@@ -603,6 +647,7 @@
               <div class="gpName">${name}</div>
               <div class="gpMeta">
                 <div><b>${roll || "—"}</b> • Room ${room || "—"}</div>
+                ${qrToken ? `<div style="margin-top:6px;"><b>QR Token:</b> ${qrToken}</div>` : ``}
               </div>
             </div>
           </div>
@@ -645,17 +690,17 @@
           </div>
           <div class="kv">
             <div class="k">STATUS</div>
-            <div class="v">APPROVED</div>
+            <div class="v">${expired ? "APPROVED (EXPIRED)" : "APPROVED"}</div>
           </div>
           <div class="kv reason">
             <div class="k">REASON</div>
-            <div class="v">${r.reason || "—"}</div>
+            <div class="v">${reasonLine}</div>
           </div>
         </div>
 
         <div class="bottom">
           <div class="stampWrap">
-            <div class="stampBig">APPROVED</div>
+            <div class="stampBig ${expired ? "expired" : ""}">${expired ? "EXPIRED" : "APPROVED"}</div>
             <div class="stampNote">
               Show this screen at the gate.<br>
               QR scan opens this same gatepass.
@@ -698,13 +743,11 @@
     }
 
     backBtn.addEventListener("click", () => {
-      // private student flow
       window.location.href = "student-dashboard.html";
     });
 
     logoutBtn.addEventListener("click", async () => {
       try{ await signOut(auth); }catch(_){}
-      // ✅ replace to avoid back-opening this page
       window.location.replace("../index.html");
     });
 
@@ -712,22 +755,15 @@
       const snap = await getDoc(doc(db, "gatepass_public", id));
       if (!snap.exists()){
         showToast("Gatepass not found / not generated yet.");
-        return;
+        return null;
       }
       const data = snap.data() || {};
-
       const st = String(data.status || "").toLowerCase();
       if (st !== "approved"){
         showToast("Gatepass available only after approval.");
-        return;
+        return null;
       }
-
-      if (isExpiredFromData(data)){
-        showToast("Gatepass expired. Please contact hostel office if needed.");
-        return;
-      }
-
-      renderGatepass({ id, ...data });
+      return { id, ...data };
     }
 
     onAuthStateChanged(auth, async (u) => {
@@ -737,49 +773,41 @@
         return;
       }
 
-      // ✅ PUBLIC VIEW
-      if (!u){
-        logoutBtn.style.display = "none";
-        backBtn.style.display = "none"; // ✅ IMPORTANT FIX
-        try{
-          await loadGatepassPublic(id);
-        }catch(e){
-          console.error(e);
-          showToast("Unable to load gatepass (public). Check Firestore rules.");
-        }
+      // Always try to read gatepass_public first (matches your new schema)
+      let gp = null;
+      try{
+        gp = await loadGatepassPublic(id);
+        if (!gp) return;
+      }catch(e){
+        console.error(e);
+        showToast("Unable to load gatepass (public). Check Firestore rules.");
         return;
       }
 
-      // ✅ PRIVATE VIEW (student)
+      // Fetch qr_token from gatepasses (best effort)
+      const qrToken = await tryFetchQrToken(id);
+      gp.__qr_token = qrToken;
+      gp.__expired = isExpiredFromData(gp);
+
+      // ✅ PUBLIC VIEW
+      if (!u){
+        logoutBtn.style.display = "none";
+        backBtn.style.display = "none";
+        renderGatepass(gp);
+        return;
+      }
+
+      // ✅ PRIVATE VIEW (student auth check using gatepass_public fields)
       try{
-        const snap = await getDoc(doc(db, "leave_requests", id));
-        if (!snap.exists()){
-          showToast("Gatepass not found.");
-          return;
-        }
+        const emailOk = normalizeEmail(gp.student_email) === normalizeEmail(u.email);
+        const uidOk = gp.student_uid && String(gp.student_uid) === String(u.uid);
 
-        const data = snap.data();
-
-        const emailOk = normalizeEmail(data.student_email) === normalizeEmail(u.email);
-        const uidOk = data.student_uid && String(data.student_uid) === String(u.uid);
         if (!emailOk && !uidOk){
           showToast("Access denied.");
           return;
         }
 
-        const st = String(data.status || "").toLowerCase();
-        if (st !== "approved"){
-          showToast("Gatepass available only after approval.");
-          return;
-        }
-
-        if (isExpiredFromData(data)){
-          showToast("Gatepass expired. Please contact hostel office if needed.");
-          return;
-        }
-
-        renderGatepass({ id, ...data });
-
+        renderGatepass(gp);
       }catch(e){
         console.error(e);
         showToast("Unable to load gatepass. Check Firestore permissions.");
