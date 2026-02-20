@@ -507,7 +507,8 @@
     <section class="card hidden" id="secApply">
       <div class="cardHead">
         <h3 class="cardTitle">Apply Leave</h3>
-        <div class="muted">Routing is automatic (based on OUT time).</div>
+        <!-- ✅ removed "Routing is automatic..." -->
+        <div class="muted"></div>
       </div>
 
       <div class="cardBody">
@@ -527,7 +528,7 @@
             <label for="reasonCategory">Reason Category</label>
             <select id="reasonCategory" required>
               <option value="" selected disabled>Select a reason</option>
-              <option value="personal">Personal</option>
+              <option value="weekend_leave">Weekend leave</option>
               <option value="academic">Academic (SIP/Placement/IV/Competition)</option>
               <option value="emergency">Emergency (Medical/Family)</option>
               <option value="vacation">Vacation</option>
@@ -536,8 +537,9 @@
           </div>
 
           <div class="field">
-            <label for="reasonText">Reason Details <span class="muted" id="reasonHint">(optional)</span></label>
-            <textarea id="reasonText" placeholder="Type details (mandatory only for Other)"></textarea>
+            <label for="reasonText">Reason Details/Place <span class="muted">(min 10 characters)</span></label>
+            <!-- ✅ mandatory for all + minlength 10 -->
+            <textarea id="reasonText" required minlength="10" placeholder="Example: Going to Chennai for medical checkup / Placement drive at..."></textarea>
           </div>
 
           <div class="row2">
@@ -650,7 +652,6 @@
 
     const reasonCategory = document.getElementById("reasonCategory");
     const reasonText = document.getElementById("reasonText");
-    const reasonHint = document.getElementById("reasonHint");
 
     const roomNo = document.getElementById("roomNo");
     const phone = document.getElementById("phone");
@@ -822,11 +823,6 @@
       phone.value = phone.value.replace(/\D/g, "").slice(0, 10);
     });
 
-    reasonCategory.addEventListener("change", () => {
-      const v = String(reasonCategory.value || "");
-      reasonHint.textContent = (v === "other") ? "(mandatory)" : "(optional)";
-    });
-
     // ===== Photo handling =====
     function extractDriveId(url){
       const u = String(url || "").trim();
@@ -983,6 +979,14 @@
     function isApprovedStatus(status){
       const s = String(status || "").toLowerCase();
       return s === "approved_final" || s === "approved_dean_final";
+    }
+
+    function getArrivalVerified(r){
+      return !!(r.arrival && r.arrival.verified);
+    }
+    function getLateMinutes(r){
+      const v = r.arrival?.late_minutes;
+      return (v === null || v === undefined) ? null : Number(v);
     }
 
     async function verifyArrival(requestId, row, codeInputEl, toastEl){
@@ -1184,37 +1188,6 @@
       }
     }
 
-    async function hasActiveRequestInSameGroup(studentEmail, outDayGroup){
-      const q1 = query(
-        collection(db, "leave_requests"),
-        where("student_email", "==", studentEmail),
-        where("routing.out_day_group", "==", outDayGroup),
-        limit(250)
-      );
-
-      const snap = await getDocs(q1);
-      if (snap.empty) return false;
-
-      for (const d of snap.docs){
-        const r = d.data() || {};
-        const st = String(r.status || "").toLowerCase();
-
-        const isPending = st.startsWith("pending");
-        const isApproved = st.startsWith("approved");
-
-        if (!isPending && !isApproved) continue;
-
-        if (isPending) return true;
-
-        if (isApproved){
-          const verified = !!(r.arrival && r.arrival.verified);
-          if (!verified) return true;
-        }
-      }
-
-      return false;
-    }
-
     // ===== Submit leave (NEW SCHEMA) =====
     leaveForm.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -1246,9 +1219,10 @@
         return;
       }
 
+      // ✅ Mandatory for ALL + min 10 chars
       const reasonVal = String(reasonText.value || "").trim();
-      if (cat === "other" && !reasonVal){
-        showToast(toastLeave, "Reason details are mandatory for Other.", "bad");
+      if (!reasonVal || reasonVal.length < 10){
+        showToast(toastLeave, "Reason Details/Place is mandatory (minimum 10 characters).", "bad");
         return;
       }
 
@@ -1274,15 +1248,7 @@
         const out_window    = computeOutWindow(outDate);
         const l1_role        = computeL1Role(outDate);
 
-        // ✅ block multiple active requests in same group
-        const hasActiveSameGroup = await hasActiveRequestInSameGroup(studentEmailLower, out_day_group);
-        if (hasActiveSameGroup){
-          const msg = (out_day_group === "weekend_block")
-            ? "You already have an active WEEKEND request. Submit a new weekend request only after your return is verified."
-            : "You already have an active WEEKDAY request. Submit a new weekday request only after your return is verified.";
-          showToast(toastLeave, msg, "bad");
-          return;
-        }
+        // ✅ REMOVED: active-request blocking completely
 
         // ✅ Secure routing config fetch (NO LIST)
         let l1_email = "";
@@ -1290,7 +1256,7 @@
           const y = Number(year) || 0;
           l1_email = await getRoutingEmail(`bc_year_${y}`, fallbackBCEmailByYear(y));
         }else{
-          const h = String(hostel || "").toLowerCase(); // boys/girls/guest_house
+          const h = String(hostel || "").toLowerCase();
           l1_email = await getRoutingEmail(`warden_${h}`, fallbackWardenByHostel(h));
         }
 
@@ -1365,17 +1331,10 @@
           updated_at: serverTimestamp()
         };
 
-        console.log("AUTH UID:", auth.currentUser?.uid);
-        console.log("AUTH EMAIL:", auth.currentUser?.email);
-        console.log("PAYLOAD UID:", payload.student_uid);
-        console.log("PAYLOAD EMAIL:", payload.student_email);
-        console.log("PAYLOAD STATUS:", payload.status);
-
         await addDoc(collection(db, "leave_requests"), payload);
 
         showToast(toastLeave, "Leave request submitted successfully.", "good");
         leaveForm.reset();
-        reasonHint.textContent = "(optional)";
 
       }catch(err){
         console.error(err);
