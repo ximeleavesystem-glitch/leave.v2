@@ -351,6 +351,14 @@
         0 10px 24px rgba(180,35,24,.10),
         inset 0 0 0 2px rgba(180,35,24,.14);
     }
+    .stampBig.waiting{
+      border-color: rgba(181,71,8,.55);
+      color:#b54708;
+      background: rgba(181,71,8,.04);
+      box-shadow:
+        0 10px 24px rgba(181,71,8,.10),
+        inset 0 0 0 2px rgba(181,71,8,.14);
+    }
     .stampBig::before{
       content:"";
       position:absolute;
@@ -360,9 +368,8 @@
       transform: rotate(0.9deg);
       pointer-events:none;
     }
-    .stampBig.expired::before{
-      border-color: rgba(180,35,24,.30);
-    }
+    .stampBig.expired::before{ border-color: rgba(180,35,24,.30); }
+    .stampBig.waiting::before{ border-color: rgba(181,71,8,.30); }
 
     .stampNote{
       color:var(--muted);
@@ -585,8 +592,22 @@
       return new Date() > inD;
     }
 
+    // ✅ not yet started = NOW < planned OUT time
+    function isBeforeOutFromData(data){
+      const outVal =
+        data?.out_datetime ??
+        data?.out_datetime_ts ??
+        data?.outDT ??
+        data?.outDateTime ??
+        data?.out_datetime_iso ??
+        null;
+
+      const outD = toJSDate(outVal);
+      if (!outD) return false; // if out time missing, don’t block
+      return new Date() < outD;
+    }
+
     function buildReasonLine(r){
-      // gatepass_public screenshot uses "reason"
       const reason =
         (r?.reason != null ? String(r.reason) : "") ||
         (r?.reason_text != null ? String(r.reason_text) : "") ||
@@ -602,6 +623,24 @@
       return (b || a || "—");
     }
 
+    function approvedByLine(r){
+      const byEmail =
+        r?.final_approved_by_email ||
+        r?.approved_by_email ||
+        r?.approved_by ||
+        r?.finalApprovedByEmail ||
+        "";
+      const byRole =
+        r?.final_approved_by_role ||
+        r?.approved_by_role ||
+        r?.finalApprovedByRole ||
+        "";
+      const e = String(byEmail || "").trim();
+      const role = String(byRole || "").trim();
+      if (e && role) return `${e} (${role})`;
+      return (e || role || "—");
+    }
+
     async function tryFetchQrToken(leaveRequestId){
       try{
         const q = query(
@@ -614,12 +653,14 @@
         const gp = snap.docs[0].data() || {};
         return String(gp.qr_token || "").trim();
       }catch(e){
-        // If rules don’t allow or index missing, we just don’t show token
         return "";
       }
     }
 
-    function renderGatepass(r){
+    /* ===================== RENDERS ===================== */
+
+    // ✅ Student view (full details)
+    function renderStudentGatepass(r){
       const name = r.student_name || "—";
       const roll = normalizeRoll(r.student_rollno || "");
       const room = r.student_room_no || "—";
@@ -742,6 +783,146 @@
       new QRCode(qrEl, { text: link, width: 150, height: 150 });
     }
 
+    // ✅ Public/QR scan view (minimal details)
+    function renderPublicApprovedOnly(r){
+      const name = r.student_name || "—";
+      const roll = normalizeRoll(r.student_rollno || "");
+      const room = r.student_room_no || "—";
+      const by = approvedByLine(r);
+
+      const expired = !!r.__expired;
+
+      const el = document.createElement("div");
+      el.innerHTML = `
+        <div class="gpTop">
+          <div class="gpStudent">
+            <img class="gpPhoto" alt="Student photo">
+            <div class="gpAvatar">${initials(name)}</div>
+            <div style="min-width:0">
+              <div class="gpName">${name}</div>
+              <div class="gpMeta">
+                <div><b>${roll || "—"}</b> • Room ${room || "—"}</div>
+                <div style="margin-top:6px;"><b>Approved by:</b> ${by}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom">
+          <div class="stampWrap">
+            <div class="stampBig ${expired ? "expired" : ""}">${expired ? "EXPIRED" : "APPROVED"}</div>
+            <div class="stampNote">
+              This QR is only for verification.<br>
+              If approved, student can be allowed.
+            </div>
+          </div>
+
+          <div>
+            <div class="qrWrap"><div id="qrHere"></div></div>
+            <div class="qrHint">Scan to open Gatepass</div>
+          </div>
+        </div>
+      `;
+
+      mount.innerHTML = "";
+      mount.appendChild(el);
+
+      const img = el.querySelector(".gpPhoto");
+      const av = el.querySelector(".gpAvatar");
+      const { primary, fallback } = resolvePhotoURL(r);
+
+      av.style.display = "grid";
+      img.style.display = "none";
+
+      if (primary){
+        let usedFallback = false;
+        img.referrerPolicy = "no-referrer";
+        img.onload = () => { img.style.display="block"; av.style.display="none"; };
+        img.onerror = () => {
+          if (!usedFallback && fallback){ usedFallback = true; img.src = fallback; return; }
+          img.style.display="none"; av.style.display="grid";
+        };
+        img.src = primary;
+      }
+
+      const link = buildQrLink(r.id);
+      const qrEl = document.getElementById("qrHere");
+      qrEl.innerHTML = "";
+      // eslint-disable-next-line no-undef
+      new QRCode(qrEl, { text: link, width: 150, height: 150 });
+    }
+
+    // ✅ Student waiting screen (before OUT time)
+    function renderWaiting(r){
+      const name = r.student_name || "—";
+      const roll = normalizeRoll(r.student_rollno || "");
+      const room = r.student_room_no || "—";
+
+      const outVal = r.out_datetime ?? r.outDT ?? r.out_datetime_ts ?? r.outDateTime ?? "";
+      const outDate = fmtDateOnly(outVal);
+      const outTime = fmtTimeOnly(outVal);
+
+      const el = document.createElement("div");
+      el.innerHTML = `
+        <div class="gpTop">
+          <div class="gpStudent">
+            <img class="gpPhoto" alt="Student photo">
+            <div class="gpAvatar">${initials(name)}</div>
+            <div style="min-width:0">
+              <div class="gpName">${name}</div>
+              <div class="gpMeta">
+                <div><b>${roll || "—"}</b> • Room ${room || "—"}</div>
+                <div style="margin-top:6px;">Gatepass will be available after:</div>
+                <div style="margin-top:4px;"><b>${outDate}</b> • <b>${outTime}</b></div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="bottom">
+          <div class="stampWrap">
+            <div class="stampBig waiting">WAIT</div>
+            <div class="stampNote">
+              You can view the gatepass only after your OUT time.<br>
+              Please wait till the allowed exit time.
+            </div>
+          </div>
+
+          <div>
+            <div class="qrWrap" style="opacity:.45; filter:grayscale(1);">
+              <div style="font-weight:950; color: var(--muted); padding:24px 10px; text-align:center;">
+                QR available<br>after OUT time
+              </div>
+            </div>
+            <div class="qrHint">Not active yet</div>
+          </div>
+        </div>
+      `;
+
+      mount.innerHTML = "";
+      mount.appendChild(el);
+
+      const img = el.querySelector(".gpPhoto");
+      const av = el.querySelector(".gpAvatar");
+      const { primary, fallback } = resolvePhotoURL(r);
+
+      av.style.display = "grid";
+      img.style.display = "none";
+
+      if (primary){
+        let usedFallback = false;
+        img.referrerPolicy = "no-referrer";
+        img.onload = () => { img.style.display="block"; av.style.display="none"; };
+        img.onerror = () => {
+          if (!usedFallback && fallback){ usedFallback = true; img.src = fallback; return; }
+          img.style.display="none"; av.style.display="grid";
+        };
+        img.src = primary;
+      }
+    }
+
+    /* ===================== LOADERS ===================== */
+
     backBtn.addEventListener("click", () => {
       window.location.href = "student-dashboard.html";
     });
@@ -773,7 +954,7 @@
         return;
       }
 
-      // Always try to read gatepass_public first (matches your new schema)
+      // Always try to read gatepass_public first
       let gp = null;
       try{
         gp = await loadGatepassPublic(id);
@@ -784,20 +965,24 @@
         return;
       }
 
-      // Fetch qr_token from gatepasses (best effort)
-      const qrToken = await tryFetchQrToken(id);
-      gp.__qr_token = qrToken;
+      // compute states
       gp.__expired = isExpiredFromData(gp);
+      gp.__before_out = isBeforeOutFromData(gp);
 
-      // ✅ PUBLIC VIEW
+      // Fetch qr_token from gatepasses (best effort)
+      gp.__qr_token = await tryFetchQrToken(id);
+
+      // ✅ PUBLIC VIEW (security QR scan)
       if (!u){
         logoutBtn.style.display = "none";
         backBtn.style.display = "none";
-        renderGatepass(gp);
+
+        // public can see approved or expired only (minimal card)
+        renderPublicApprovedOnly(gp);
         return;
       }
 
-      // ✅ PRIVATE VIEW (student auth check using gatepass_public fields)
+      // ✅ PRIVATE VIEW (student)
       try{
         const emailOk = normalizeEmail(gp.student_email) === normalizeEmail(u.email);
         const uidOk = gp.student_uid && String(gp.student_uid) === String(u.uid);
@@ -807,7 +992,14 @@
           return;
         }
 
-        renderGatepass(gp);
+        // student cannot view before OUT time
+        if (!gp.__expired && gp.__before_out){
+          renderWaiting(gp);
+          return;
+        }
+
+        // normal student view (approved or expired)
+        renderStudentGatepass(gp);
       }catch(e){
         console.error(e);
         showToast("Unable to load gatepass. Check Firestore permissions.");
