@@ -34,7 +34,6 @@
       min-height:100vh;
     }
 
-    /* Topbar */
     .topbar{
       position:sticky; top:0; z-index:50;
       background: rgba(255,255,255,.86);
@@ -57,7 +56,6 @@
       white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:560px;
     }
 
-    /* Buttons */
     .btn{
       padding:10px 14px; border:none; border-radius:12px;
       font-weight:800; cursor:pointer; color:#fff;
@@ -70,7 +68,6 @@
 
     .wrap{ max-width:1200px; margin:auto; padding:16px 16px 26px; }
 
-    /* Tabs */
     .tabs{ display:flex; gap:10px; flex-wrap:wrap; margin-bottom:14px; }
     .tab{
       border:1px solid var(--line);
@@ -94,7 +91,6 @@
       box-shadow: 0 10px 18px rgba(193,18,31,.08);
     }
 
-    /* Panel */
     .panel{
       background:var(--card);
       border:1px solid var(--line);
@@ -123,7 +119,6 @@
     .sectionTitle h4{ margin:0; font-size:13px; font-weight:850; color: var(--redDark); }
     .sectionTitle .hint{ font-size:12px; color: var(--muted); font-weight:650; }
 
-    /* Metrics */
     .metricsWrap{ display:grid; gap:14px; margin-top:6px; }
     .metrics{ display:grid; grid-template-columns: repeat(4, minmax(190px, 1fr)); gap:12px; }
     @media(max-width: 980px){ .metrics{ grid-template-columns: repeat(2, minmax(190px, 1fr)); } }
@@ -138,7 +133,6 @@
     .metric .k{ font-size:11px; color:var(--muted); font-weight:750; letter-spacing:.2px; }
     .metric .v{ margin-top:8px; font-size:28px; font-weight:900; }
 
-    /* Pills */
     .pill{
       display:inline-flex; align-items:center; gap:8px;
       border-radius:999px; padding:6px 10px;
@@ -151,7 +145,6 @@
     .pill.rejected{ color: var(--bad); border-color: rgba(180,35,24,.22); background: rgba(180,35,24,.06); }
     .pill.locked{ color:#374151; border-color: rgba(55,65,81,.25); background: rgba(55,65,81,.06); }
 
-    /* Filters */
     .filters{
       display:flex; flex-wrap:wrap; gap:10px;
       margin-bottom:12px; padding:10px;
@@ -206,7 +199,6 @@
     .qBtn:hover{ transform: translateY(-1px); border-color: rgba(193,18,31,.35); }
     .qBtn.active{ background: rgba(193,18,31,.08); border-color: rgba(193,18,31,.55); color: var(--redDark); }
 
-    /* Request cards */
     .requestCard{
       background:#fff;
       border:1px solid var(--line);
@@ -301,7 +293,6 @@
       border-radius:14px;
     }
 
-    /* Reports (Download PDF) */
     .reportsShell{
       border:1px solid var(--line);
       border-radius:18px;
@@ -476,7 +467,6 @@
                 </div>
               </div>
 
-              <!-- Roll input ONLY in student mode -->
               <div class="rollRow" id="rollRow">
                 <div class="rBox">
                   <label>Roll No (Required for Student-wise)</label>
@@ -503,7 +493,7 @@
       </div>
     </section>
 
-    <!-- INTIMATIONS (APPROVED FINAL, NO DEAN ACTION) -->
+    <!-- INTIMATIONS -->
     <section class="panel hidden" id="pageIntimations">
       <div class="panelHead">
         <h3 class="panelTitle"><span class="dot"></span>Intimations — Approved Final (No Dean Action)</h3>
@@ -532,7 +522,7 @@
       </div>
     </section>
 
-    <!-- HISTORY (DEAN ACTED ONLY) -->
+    <!-- HISTORY -->
     <section class="panel hidden" id="pageHistory">
       <div class="panelHead">
         <h3 class="panelTitle"><span class="dot"></span>History — Dean Acted</h3>
@@ -567,7 +557,6 @@
     </section>
   </div>
 
-  <!-- ✅ IMPORTANT: UMD builds (NO module imports) to avoid @babel/runtime error -->
   <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 
@@ -579,10 +568,8 @@
       updateDoc, doc, serverTimestamp, getDoc, setDoc
     } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-    // ✅ bfcache fix
     window.addEventListener("pageshow", (e) => { if (e.persisted) window.location.reload(); });
 
-    // ✅ jsPDF from UMD global
     const { jsPDF } = window.jspdf || {};
     if (!jsPDF){ console.error("jsPDF not loaded. Check CDN access."); }
 
@@ -613,36 +600,30 @@
 
     const logoutBtn = document.getElementById("logoutBtn");
 
-    // Tabs
     const tabDash = document.getElementById("tabDash");
     const tabEscalations = document.getElementById("tabEscalations");
     const tabIntimations = document.getElementById("tabIntimations");
     const tabHistory = document.getElementById("tabHistory");
 
-    // Pages
     const pageDash = document.getElementById("pageDash");
     const pageEscalations = document.getElementById("pageEscalations");
     const pageIntimations = document.getElementById("pageIntimations");
     const pageHistory = document.getElementById("pageHistory");
 
-    // Dashboard filters
     const dFrom = document.getElementById("dFrom");
     const dTo = document.getElementById("dTo");
     const applyDashBtn = document.getElementById("applyDashBtn");
     const clearDashBtn = document.getElementById("clearDashBtn");
 
-    // Dashboard metrics
     const mDeanPending = document.getElementById("mDeanPending");
     const mDeanApproved = document.getElementById("mDeanApproved");
     const mDeanRejected = document.getElementById("mDeanRejected");
     const mIntimations = document.getElementById("mIntimations");
 
-    // Lists
     const escalationsList = document.getElementById("escalationsList");
     const intimationList = document.getElementById("intimationList");
     const historyList = document.getElementById("historyList");
 
-    // Intimation filters
     const iSearch = document.getElementById("iSearch");
     const iYear = document.getElementById("iYear");
     const iHostel = document.getElementById("iHostel");
@@ -652,7 +633,6 @@
     const applyIntBtn = document.getElementById("applyIntBtn");
     const clearIntBtn = document.getElementById("clearIntBtn");
 
-    // History filters
     const hSearch = document.getElementById("hSearch");
     const hStatus = document.getElementById("hStatus");
     const hYear = document.getElementById("hYear");
@@ -663,7 +643,6 @@
     const applyHistBtn = document.getElementById("applyHistBtn");
     const clearHistBtn = document.getElementById("clearHistBtn");
 
-    // Reports UI
     const modeTimeframe = document.getElementById("modeTimeframe");
     const modeStudent = document.getElementById("modeStudent");
     const modeLate = document.getElementById("modeLate");
@@ -733,35 +712,19 @@
 
     function toISO(value){
       if (!value) return "";
-
-      // Firestore Timestamp (has toDate)
-      if (typeof value === "object" && typeof value.toDate === "function"){
-        return value.toDate().toISOString();
-      }
-
-      // Firestore Timestamp (plain object {seconds, nanoseconds})
-      if (typeof value === "object" && typeof value.seconds === "number"){
-        return new Date(value.seconds * 1000).toISOString();
-      }
-
-      // JS Date
-      if (value instanceof Date){
-        return value.toISOString();
-      }
-
-      // String
+      if (typeof value === "object" && typeof value.toDate === "function") return value.toDate().toISOString();
+      if (typeof value === "object" && typeof value.seconds === "number") return new Date(value.seconds * 1000).toISOString();
+      if (value instanceof Date) return value.toISOString();
       if (typeof value === "string"){
         const d = new Date(value);
         return isNaN(d) ? "" : d.toISOString();
       }
-
       return "";
     }
 
     function getOutDT(r){ return toISO(r.out_datetime || r.outDT || r.outDateTime || r.out_time || r.outTime || ""); }
     function getInDT(r){ return toISO(r.in_datetime || r.inDT || r.inDateTime || r.in_time || r.inTime || ""); }
 
-    // ✅ NEW: lock logic
     function canActBeforeOut(r){
       const outISO = getOutDT(r);
       const outD = parseISO(outISO);
@@ -837,33 +800,27 @@
       return String(r.student_hostel || "").toLowerCase() === String(h).toLowerCase();
     }
 
-    // ✅ Create/update public gatepass doc (so QR works without login)
     async function upsertPublicGatepass(requestId, r){
       const payload = {
         status: "approved",
         approved_public_at: isoNow(),
-
         student_name: r.student_name || r.student?.name || "",
         student_rollno: r.student_rollno || r.student?.rollno || "",
         student_room_no: r.student_room_no || r.student?.room || r.student?.roomNo || "",
         student_email: r.student_email || r.studentEmail || r.student?.email || "",
         student_uid: r.student_uid || r.studentUid || r.student?.uid || "",
-
         leave_type: r.leave_type || "extended",
         out_datetime: getOutDT(r) || "",
         in_datetime: getInDT(r) || "",
-
         reason: r.reason_text || r.reason || r.reasonText || "",
         contact_no: r.contact_no || r.phone || r.contact || "",
         photo_url: r.photo_url || r.photoUrl || r.student_photo_url || r.studentPhotoUrl || "",
-
         updatedAt: serverTimestamp(),
         updated_at: serverTimestamp()
       };
       await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
     }
 
-    // ✅ NEW: revoke/disable public gatepass (if Dean rejects or flips to reject)
     async function revokePublicGatepass(requestId, note){
       const payload = {
         status: "revoked",
@@ -875,7 +832,6 @@
       await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
     }
 
-    // ✅ Drive-photo resolver logic
     function extractDriveId(url){
       const u = String(url || "").trim();
       if (!u) return "";
@@ -958,6 +914,52 @@
       return "";
     }
 
+    /* ✅ NEW: ensure Dean stage exists in chain */
+    function ensureDeanInChain(chain){
+      const list = Array.isArray(chain) ? [...chain] : [];
+      const deanIdx = list.findIndex(x => normalizeEmail(x?.email) === normalizeEmail(DEAN_EMAIL));
+      if (deanIdx >= 0) return { list, deanIdx };
+
+      const maxStage = list.reduce((m, x) => {
+        const s = Number(x?.stage);
+        return Number.isFinite(s) ? Math.max(m, s) : m;
+      }, 0);
+
+      const deanEntry = {
+        stage: maxStage + 1,
+        role: "dean",
+        email: normalizeEmail(DEAN_EMAIL),
+        action: "pending",
+        status: "pending",
+        remark: "",
+        acted_at: "",
+        actedAt: ""
+      };
+
+      list.push(deanEntry);
+      return { list, deanIdx: list.length - 1 };
+    }
+
+    function updateDeanChain(chain, remark, action){
+      const ensured = ensureDeanInChain(chain);
+      const list = ensured.list;
+      const idx = ensured.deanIdx;
+
+      const nowISO = isoNow();
+      list[idx] = {
+        ...list[idx],
+        email: normalizeEmail(DEAN_EMAIL),
+        role: list[idx].role || "dean",
+        action: action,
+        status: action,
+        remark: remark || "",
+        acted_at: nowISO,
+        actedAt: nowISO,
+        acted_on: nowISO
+      };
+      return { ok:true, list };
+    }
+
     /* ---------------- Dashboard ---------------- */
     async function loadDashboard(){
       const from = dFrom.value;
@@ -997,23 +999,18 @@
       await loadDashboard();
     });
 
-    /* ---------------- Cards ---------------- */
     function baseStudentInfo(r){
       const studentName = r.student_name || r.student?.name || "—";
       const roll = r.student_rollno || r.student?.rollno || "—";
       const email = r.student_email || r.student?.email || "—";
       const room = r.student_room_no || r.student?.room || r.student?.roomNo || "—";
-
       const reason = r.reason_text || r.reason || r.reasonText || r.leave_reason || r.leaveReason || "-";
-
       const outVal = getOutDT(r) || "";
       const inVal = getInDT(r) || "";
-
       const photo =
         r.student_photo_url || r.studentPhotoUrl ||
         r.photo_url || r.photoUrl ||
         r.student?.photo_url || r.student?.photoUrl || "";
-
       return { studentName, roll, email, room, reason, outVal, inVal, photo };
     }
 
@@ -1036,7 +1033,6 @@
 
       const escBy = r.escalation?.requested_by || "";
       const escReason = r.escalation?.reason || "";
-
       const locked = !canActBeforeOut(r);
 
       text.innerHTML = `
@@ -1047,10 +1043,7 @@
           <b>Escalated By:</b> ${escBy || "—"} &nbsp; • &nbsp; <b>Escalation Reason:</b> ${escReason || "—"}
         </div>
         <div class="studentMeta" style="margin-top:6px;">
-          ${locked
-            ? `<span class="pill locked">LOCKED (Out time passed)</span>`
-            : `<span class="pill pending">EDITABLE until OUT time</span>`
-          }
+          ${locked ? `<span class="pill locked">LOCKED (Out time passed)</span>` : `<span class="pill pending">EDITABLE until OUT time</span>`}
         </div>
       `;
 
@@ -1114,13 +1107,10 @@
       const verified = getArrivalVerified(r);
       const actual = getActualIn(r);
       const lateMin = getLateMinutes(r);
-
       const approvedBy = getApprovedBy(r);
 
       const lateTxt = (verified && lateMin !== null)
-        ? (lateMin > 0
-            ? `<b style="color:var(--bad)">Late:</b> ${lateMin} min`
-            : `<b style="color:var(--good)">On Time</b>`)
+        ? (lateMin > 0 ? `<b style="color:var(--bad)">Late:</b> ${lateMin} min` : `<b style="color:var(--good)">On Time</b>`)
         : `<b style="color:var(--warn)">Arrival:</b> Not verified`;
 
       card.innerHTML = `
@@ -1164,9 +1154,7 @@
       const lateMin = getLateMinutes(r);
 
       const lateTxt = (verified && lateMin !== null)
-        ? (lateMin > 0
-            ? `<b style="color:var(--bad)">Late:</b> ${lateMin} min`
-            : `<b style="color:var(--good)">On Time</b>`)
+        ? (lateMin > 0 ? `<b style="color:var(--bad)">Late:</b> ${lateMin} min` : `<b style="color:var(--good)">On Time</b>`)
         : `<b style="color:var(--warn)">Arrival:</b> Not verified`;
 
       const status = String(r.status || "").toLowerCase();
@@ -1205,7 +1193,6 @@
       const sb = card.querySelector(".studentBlock");
       sb.prepend(buildAvatarNode(studentName, photo));
 
-      // ✅ NEW: Change-decision buttons (only before OUT time)
       if (status === "approved_dean_final" || status === "rejected_dean"){
         const actions = document.createElement("div");
         actions.className = "actionsRow";
@@ -1232,7 +1219,6 @@
       return card;
     }
 
-    /* ---------------- Load lists ---------------- */
     async function loadEscalations(){
       escalationsList.innerHTML = "";
       const q1 = query(collection(db, "leave_requests"), where("status", "==", "pending_dean"), limit(5000));
@@ -1387,25 +1373,6 @@
       await loadHistory();
     });
 
-    /* ---------------- Dean Approve/Reject ---------------- */
-    function updateDeanChain(chain, remark, action){
-      const list = Array.isArray(chain) ? [...chain] : [];
-      const idx = list.findIndex(x => normalizeEmail(x?.email) === normalizeEmail(DEAN_EMAIL));
-      if (idx < 0) return { ok:false, list };
-
-      const nowISO = isoNow();
-      list[idx] = {
-        ...list[idx],
-        action: action,
-        status: action,
-        remark: remark || "",
-        acted_at: nowISO,
-        actedAt: nowISO,
-        acted_on: nowISO
-      };
-      return { ok:true, list };
-    }
-
     async function deanApprove(id){
       const remark = (document.getElementById(`remark_${id}`)?.value || "").trim();
       const ref = doc(db, "leave_requests", id);
@@ -1413,49 +1380,41 @@
       if (!snap.exists()) return;
 
       const r = snap.data();
-
       if (String(r.status||"").toLowerCase() !== "pending_dean"){
         alert("This request is not pending with Dean.");
         return;
       }
 
-      // ✅ Lock check (must be before OUT time)
       if (!canActBeforeOut(r)){
         alert("Out time already reached. Dean action is locked for this request.");
         return;
       }
 
-      const { ok, list } = updateDeanChain(r.approver_chain, remark, "approved");
-      if (!ok){
-        alert("Dean stage not found in approver_chain.");
-        return;
-      }
+      const { list } = updateDeanChain(r.approver_chain, remark, "approved");
 
+      const nowISO = isoNow();
       const updates = {
         approver_chain: list,
         status: "approved_dean_final",
-
-        escalation: { ...(r.escalation || {}), requested: true, dean_action: "approved", dean_acted_at: isoNow() },
-
+        escalation: { ...(r.escalation || {}), requested: true, dean_action: "approved", dean_acted_at: nowISO },
         current_holder_email: null,
         current: { ...(r.current || {}), holder_email: null, holder_role: null, stage: null },
-
         final_approved_by: normalizeEmail(DEAN_EMAIL),
-        final_approved_at: isoNow(),
-
+        final_approved_at: nowISO,
         final_rejected_by: null,
         final_rejected_at: null,
-
         dean_acted_by: normalizeEmail(DEAN_EMAIL),
-        dean_acted_at: isoNow(),
-
+        dean_acted_at: nowISO,
         updated_at: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
       try{
         await updateDoc(ref, updates);
-        await upsertPublicGatepass(id, { ...r, ...updates });
+
+        // ✅ do NOT block approval if gatepass_public fails
+        try { await upsertPublicGatepass(id, { ...r, ...updates }); }
+        catch(e){ console.warn("gatepass_public upsert failed:", e); }
 
         await loadDashboard();
         await loadEscalations();
@@ -1473,46 +1432,41 @@
       if (!snap.exists()) return;
 
       const r = snap.data();
-
       if (String(r.status||"").toLowerCase() !== "pending_dean"){
         alert("This request is not pending with Dean.");
         return;
       }
 
-      // ✅ Lock check (must be before OUT time)
       if (!canActBeforeOut(r)){
         alert("Out time already reached. Dean action is locked for this request.");
         return;
       }
 
-      const { ok, list } = updateDeanChain(r.approver_chain, remark, "rejected");
-      if (!ok){
-        alert("Dean stage not found in approver_chain.");
-        return;
-      }
+      const { list } = updateDeanChain(r.approver_chain, remark, "rejected");
+      const nowISO = isoNow();
 
       const updates = {
         approver_chain: list,
         status: "rejected_dean",
-
-        escalation: { ...(r.escalation || {}), requested: true, dean_action: "rejected", dean_acted_at: isoNow() },
-
+        escalation: { ...(r.escalation || {}), requested: true, dean_action: "rejected", dean_acted_at: nowISO },
         current_holder_email: null,
         current: { ...(r.current || {}), holder_email: null, holder_role: null, stage: null },
-
+        // ✅ keep clean
+        final_approved_by: null,
+        final_approved_at: null,
         final_rejected_by: normalizeEmail(DEAN_EMAIL),
-        final_rejected_at: isoNow(),
-
+        final_rejected_at: nowISO,
         dean_acted_by: normalizeEmail(DEAN_EMAIL),
-        dean_acted_at: isoNow(),
-
+        dean_acted_at: nowISO,
         updated_at: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
 
       try{
         await updateDoc(ref, updates);
-        await revokePublicGatepass(id, remark || "Dean rejected");
+
+        try { await revokePublicGatepass(id, remark || "Dean rejected"); }
+        catch(e){ console.warn("gatepass_public revoke failed:", e); }
 
         await loadDashboard();
         await loadEscalations();
@@ -1523,7 +1477,6 @@
       }
     }
 
-    // ✅ NEW: Change decision in History before OUT time
     async function deanChangeDecision(id, targetStatus){
       const ref = doc(db, "leave_requests", id);
       const snap = await getDoc(ref);
@@ -1538,7 +1491,6 @@
         return;
       }
 
-      // ✅ Lock check
       if (!canActBeforeOut(r)){
         alert("Out time already reached. Decision change is locked.");
         return;
@@ -1550,28 +1502,19 @@
       }
 
       const remark = (prompt("Dean remark for decision change (optional):") || "").trim();
-
       const action = (target === "approved_dean_final") ? "approved" : "rejected";
-      const { ok, list } = updateDeanChain(r.approver_chain, remark, action);
-      if (!ok){
-        alert("Dean stage not found in approver_chain.");
-        return;
-      }
 
+      const { list } = updateDeanChain(r.approver_chain, remark, action);
       const nowISO = isoNow();
 
       const updates = {
         approver_chain: list,
         status: target,
-
         escalation: { ...(r.escalation || {}), requested: true, dean_action: action, dean_acted_at: nowISO },
-
         current_holder_email: null,
         current: { ...(r.current || {}), holder_email: null, holder_role: null, stage: null },
-
         dean_acted_by: normalizeEmail(DEAN_EMAIL),
         dean_acted_at: nowISO,
-
         updated_at: serverTimestamp(),
         updatedAt: serverTimestamp()
       };
@@ -1582,6 +1525,9 @@
         updates.final_rejected_by = null;
         updates.final_rejected_at = null;
       } else {
+        // ✅ IMPORTANT: clear approved fields also
+        updates.final_approved_by = null;
+        updates.final_approved_at = null;
         updates.final_rejected_by = normalizeEmail(DEAN_EMAIL);
         updates.final_rejected_at = nowISO;
       }
@@ -1590,9 +1536,11 @@
         await updateDoc(ref, updates);
 
         if (target === "approved_dean_final"){
-          await upsertPublicGatepass(id, { ...r, ...updates });
+          try { await upsertPublicGatepass(id, { ...r, ...updates }); }
+          catch(e){ console.warn("gatepass_public upsert failed:", e); }
         } else {
-          await revokePublicGatepass(id, remark || "Dean changed to rejected");
+          try { await revokePublicGatepass(id, remark || "Dean changed to rejected"); }
+          catch(e){ console.warn("gatepass_public revoke failed:", e); }
         }
 
         await loadDashboard();
@@ -1604,7 +1552,7 @@
       }
     }
 
-    /* ---------------- Reports ---------------- */
+    /* ---------------- Reports (unchanged) ---------------- */
     function setMode(m){
       reportMode = m;
       modeTimeframe.classList.toggle("active", m==="timeframe");
@@ -1735,7 +1683,6 @@
         const actualIn = getActualIn(r) ? fmtDT(getActualIn(r)) : "-";
         const lateMin = getLateMinutes(r);
         const lateTxt = (lateMin === null || lateMin === undefined) ? "-" : String(lateMin);
-
         const approvedBy = getApprovedBy(r) || "-";
 
         return [
@@ -1824,7 +1771,6 @@
       }
     });
 
-    /* ---------------- Auth ---------------- */
     onAuthStateChanged(auth, async (u) => {
       if (!u){
         window.location.replace("../index.html");
