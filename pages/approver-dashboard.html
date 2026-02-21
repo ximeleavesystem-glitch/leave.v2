@@ -897,12 +897,18 @@ textarea:focus{
     return new Date() < outD;
   }
 
-  function isEscalatedLocked(row){
-    const st = String(row?.status || "").toLowerCase();
-    if (st === "pending_dean") return true;
-    if (!!row?.escalation?.requested) return true;
-    return false;
-  }
+ function isEscalatedLocked(row){
+  const st = String(row?.status || "").toLowerCase();
+  if (st === "pending_dean") return true;
+
+  const esc = row?.escalation || {};
+  if (esc?.requested === true) return true;
+
+  // 🔥 IMPORTANT: match Firestore rules
+  if (esc?.dean_action != null && String(esc.dean_action) !== "not_required") return true;
+
+  return false;
+}
 
   function getCurrentHolderEmail(row){
     return String(row?.current?.holder_email || row?.current_holder_email || row?.currentHolderEmail || row?.current_holder || "").trim();
@@ -2056,3 +2062,4 @@ textarea:focus{
 </script>
 </body>
 </html>
+
