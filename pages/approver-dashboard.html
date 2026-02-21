@@ -413,7 +413,7 @@ textarea:focus{
   border:none;
   padding:11px 18px;
   border-radius:16px;
-  font-weight:1050;
+  font-weight:1100;
   cursor:pointer;
   transition: .15s ease;
   box-shadow: 0 12px 24px rgba(2,6,23,.14);
@@ -1360,8 +1360,12 @@ textarea:focus{
         ` : ``}
 
         <div class="actions">
-          <button class="actionBtn approveBtn" data-id="${r.id}" type="button">Approve</button>
-          <button class="actionBtn rejectBtn" data-id="${r.id}" type="button">Reject</button>
+          <button class="actionBtn approveBtn" data-id="${r.id}" type="button">
+  Change to Approved
+</button>
+         <button class="actionBtn approveBtn" data-id="${r.id}" type="button">
+  Change to Approved
+</button>
         </div>
       `;
 
@@ -1969,3 +1973,4 @@ textarea:focus{
 </script>
 </body>
 </html>
+
