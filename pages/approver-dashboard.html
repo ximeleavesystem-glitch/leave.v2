@@ -2228,7 +2228,13 @@ console.log("OUT:", r.out_datetime);
       window.location.replace("../index.html");
       return;
     }
+import { setDoc, doc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
+await setDoc(doc(db, "users", u.uid), {
+  email: u.email || "",
+  updatedAt: serverTimestamp(),
+  updated_at: serverTimestamp()
+}, { merge: true });
     currentUserEmailRaw = String(u.email || "").trim();
     currentUserEmailLower = currentUserEmailRaw.toLowerCase();
 
@@ -2271,6 +2277,7 @@ console.log("OUT:", r.out_datetime);
 </script>
 </body>
 </html>
+
 
 
 
