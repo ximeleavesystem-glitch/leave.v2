@@ -427,31 +427,6 @@ textarea:focus{
 .approveBtn{ background: linear-gradient(135deg, var(--good), #14b8a6); }
 .rejectBtn{ background: linear-gradient(135deg, var(--bad), #ff3b3b); }
 
-.changeBtn{
-  border:none;
-  padding:10px 14px;
-  border-radius:14px;
-  font-weight:1000;
-  cursor:pointer;
-  transition:.15s ease;
-  box-shadow: 0 10px 22px rgba(2,6,23,.10);
-  color:#fff;
-}
-.changeBtn:hover{ transform: translateY(-1px); }
-.changeApprove{ background: linear-gradient(135deg, var(--good), #14b8a6); }
-.changeReject{ background: linear-gradient(135deg, var(--bad), #ff3b3b); }
-
-.lockNote{
-  margin-top:10px;
-  padding:10px 12px;
-  border-radius:14px;
-  border:1px dashed rgba(180,35,24,.35);
-  background: rgba(180,35,24,.05);
-  color:#7a1512;
-  font-weight:900;
-  font-size:12.5px;
-}
-
 .inlineOpt{
   display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   padding:10px 12px; border-radius:16px; border:1px dashed rgba(193,18,31,.3);
@@ -462,6 +437,18 @@ textarea:focus{
 }
 .inlineOpt input{ width:auto; }
 .smallNote{ font-size:12px; color:var(--muted); font-weight:850; margin-top:8px; line-height:1.4; }
+
+/* New note for immutability */
+.finalNote{
+  margin-top:10px;
+  padding:10px 12px;
+  border-radius:14px;
+  border:1px dashed rgba(15,23,42,.22);
+  background: rgba(15,23,42,.03);
+  color:#0f172a;
+  font-weight:900;
+  font-size:12.5px;
+}
 </style>
 </head>
 
@@ -717,7 +704,7 @@ textarea:focus{
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
   import {
     getFirestore, doc, getDoc, collection, getDocs, query, where, updateDoc,
-    serverTimestamp, setDoc, Timestamp, deleteField
+    serverTimestamp, setDoc
   } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
   window.addEventListener("pageshow", (e) => {
@@ -888,25 +875,6 @@ textarea:focus{
     return isNaN(d) ? null : d;
   }
 
-  function isBeforeOutTime(row){
-    const outVal = getOutDT(row);
-    const outD = toJSDate(outVal);
-    if (!outD) return false;
-    return new Date() < outD;
-  }
-
-  function isEscalatedLocked(row){
-    const st = String(row?.status || "").toLowerCase();
-    if (st === "pending_dean") return true;
-
-    const esc = row?.escalation || {};
-    if (esc?.requested === true) return true;
-
-    if (esc?.dean_action != null && String(esc.dean_action) !== "not_required") return true;
-
-    return false;
-  }
-
   function getCurrentHolderEmail(row){
     return String(row?.current?.holder_email || row?.current_holder_email || row?.currentHolderEmail || row?.current_holder || "").trim();
   }
@@ -966,36 +934,6 @@ textarea:focus{
     if (h <= 0) return `${r}m`;
     if (r === 0) return `${h}h`;
     return `${h}h ${r}m`;
-  }
-
-  function getArrivalStatusText(row){
-    const plannedInVal = getInDT(row);
-    const plannedIn = toJSDate(plannedInVal);
-    if (!plannedIn) return "";
-
-    const now = new Date();
-    if (now < plannedIn) return "";
-
-    const arrival = row.arrival || {};
-    const verified = !!arrival.verified;
-
-    if (!verified) return "Not yet reached";
-
-    const actualVal =
-      arrival.actual_in_time ||
-      arrival.actual_in_datetime ||
-      arrival.verified_at ||
-      arrival.verifiedAt ||
-      null;
-
-    const actualIn = toJSDate(actualVal);
-    if (!actualIn) return "Reached";
-
-    const diffMins = Math.round((actualIn.getTime() - plannedIn.getTime()) / 60000);
-
-    if (diffMins > 0) return `Late by ${minutesToHM(diffMins)}`;
-    if (diffMins === 0) return "On time";
-    return `Before time by ${minutesToHM(Math.abs(diffMins))}`;
   }
 
   function isFinalApprovedStatus(st){
@@ -1084,8 +1022,6 @@ textarea:focus{
     if (rc === "weekend" || rc === "weekend leave") return true;
     return false;
   }
-
-  const YEAR_TO_BATCH = { "1":"Batch 9", "2":"Batch 8" };
 
   function computeCapabilitiesFromRoleDoc(d){
     bcYears = Array.isArray(d?.bc_years) ? d.bc_years.map(x => String(x)) : [];
@@ -1498,14 +1434,6 @@ textarea:focus{
     renderHistory();
   }
 
-  function canChangeMyDecision(row){
-    const myAct = didIAct(row.approver_chain);
-    if (!myAct) return false;
-    if (!isBeforeOutTime(row)) return false;
-    if (isEscalatedLocked(row)) return false;
-    return true;
-  }
-
   function renderHistory(){
     let rows = [];
 
@@ -1559,10 +1487,6 @@ textarea:focus{
 
       const arrivalLine = computeArrivalStatusLine(r);
 
-      const allowChange = canChangeMyDecision(r);
-      const myAction = didIAct(r.approver_chain);
-      const changeRemarkId = `chg_remark_${r.id}`;
-
       const card = document.createElement("section");
       card.className = "requestCard";
       card.innerHTML = `
@@ -1585,28 +1509,11 @@ textarea:focus{
           <div class="kv reasonBox"><div class="k">REASON</div><div class="v">${reasonLine || "-"}</div></div>
         </div>
 
-        ${
-          allowChange ? `
-            <textarea id="${changeRemarkId}" placeholder="Remark for change (optional)"></textarea>
-            <div class="actions">
-              ${myAction !== "approved" ? `<button class="changeBtn changeApprove" data-id="${r.id}" data-action="approved" type="button">Change to APPROVE</button>` : ``}
-              ${myAction !== "rejected" ? `<button class="changeBtn changeReject" data-id="${r.id}" data-action="rejected" type="button">Change to REJECT</button>` : ``}
-            </div>
-            <div class="smallNote">Allowed only until OUT time. Once escalated to Dean, it becomes locked.</div>
-          ` : (isEscalatedLocked(r) ? `<div class="lockNote">Locked: Escalated to Dean / pending Dean. No changes allowed.</div>` : ``)
-        }
+        <div class="finalNote">🔒 Decision is final once Approved/Rejected. Changes are not allowed.</div>
       `;
       historyContainer.appendChild(card);
       hydrateStudentPhoto(card, roll, studentName, r);
     }
-
-    historyContainer.querySelectorAll(".changeBtn").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.dataset.id;
-        const action = btn.dataset.action;
-        await handleChangeDecision(id, action);
-      });
-    });
   }
 
   function updateHistoryCounts(){
@@ -1642,13 +1549,13 @@ textarea:focus{
     await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
   }
 
-  async function revokePublicGatepass(requestId, reason="decision_changed"){
+  async function revokePublicGatepass(requestId, reason="rejected"){
     const payload = {
       status: "revoked",
       revoked_at: serverTimestamp(),
       revokedAt: serverTimestamp(),
       revoked_by: currentUserEmailLower,
-      revoke_reason: String(reason || "decision_changed"),
+      revoke_reason: String(reason || "rejected"),
       updatedAt: serverTimestamp(),
       updated_at: serverTimestamp()
     };
@@ -1702,66 +1609,6 @@ textarea:focus{
     }
 
     return arr;
-  }
-
-  // ===== Change decision (History) =====
-  async function handleChangeDecision(requestId, newAction){
-    const r = cacheAllForApprover.find(x => x.id === requestId);
-    if (!r) return;
-
-    if (!didIAct(r.approver_chain)){
-      alert("You did not act on this request.");
-      return;
-    }
-    if (!isBeforeOutTime(r)){
-      alert("Cannot change decision after OUT time.");
-      return;
-    }
-    if (isEscalatedLocked(r)){
-      alert("Cannot change once escalated to Dean / pending Dean.");
-      return;
-    }
-
-    const remark = (document.getElementById(`chg_remark_${requestId}`)?.value || "").trim();
-    const chain0 = Array.isArray(r.approver_chain) ? r.approver_chain : [];
-    const chain = markMyChainAction(chain0, newAction, remark);
-
-    const finalStatus =
-      (newAction === "approved")
-        ? ( (String(r.status||"").toLowerCase() === "approved_dean_final") ? "approved_dean_final" : "approved_final" )
-        : ( (String(r.status||"").toLowerCase() === "rejected_dean") ? "rejected_dean" : "rejected_l1" );
-
-    const updates = {
-      approver_chain: chain,
-      approver_emails: (Array.isArray(r.approver_emails) ? r.approver_emails : []).length ? r.approver_emails : chain.map(x => normalizeEmail(x.email)).filter(Boolean),
-      status: finalStatus,
-      updated_at: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      escalation: {
-        ...(r.escalation || {}),
-        requested: false,
-        dean_action: "not_required"
-      }
-    };
-    clearCurrentFields(updates);
-
-    try{
-      await updateDoc(doc(db, "leave_requests", requestId), updates);
-
-      if (newAction !== "approved"){
-        await revokePublicGatepass(requestId, "decision_changed_to_rejected");
-      } else {
-        await upsertPublicGatepass(requestId, { ...r, ...updates });
-      }
-
-      await refreshCache();
-      computeDashboardMetrics();
-      renderPendingRequests();
-      renderHistory();
-    }catch(e){
-      console.error(e);
-      alert(`Unable to change decision.\n\n${e?.code || ""}\n${e?.message || e}`);
-    }
   }
 
   // ===== Approve / Reject (Pending page) =====
