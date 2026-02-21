@@ -1908,7 +1908,7 @@ textarea:focus{
         dean_action: "not_required"
       };
     }
-
+console.log("UPDATE PAYLOAD KEYS:", Object.keys(updates));
     try{
       await updateDoc(doc(db, "leave_requests", requestId), updates);
 
@@ -2261,3 +2261,4 @@ textarea:focus{
 </script>
 </body>
 </html>
+
