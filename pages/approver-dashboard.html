@@ -1754,6 +1754,11 @@ textarea:focus{
       }
     };
 console.log("UPDATE PAYLOAD KEYS:", Object.keys(updates));
+console.log("UPDATE PAYLOAD:", JSON.stringify(updates, null, 2));
+console.log("CURRENT STATUS:", r.status);
+console.log("NEW STATUS:", updates.status);
+console.log("CURRENT HOLDER:", r.current_holder_email, r.current?.holder_email);
+console.log("OUT:", r.out_datetime);
     try{
       await updateDoc(doc(db, "leave_requests", requestId), updates);
 
@@ -1871,7 +1876,10 @@ console.log("UPDATE PAYLOAD KEYS:", Object.keys(updates));
       renderPendingRequests();
       renderHistory();
     }catch(e){
-      console.error(e);
+      console.error("UPDATE FAILED:", e.code, e.message);
+  console.error("FAILED PAYLOAD KEYS:", Object.keys(updates));
+  console.error("FAILED PAYLOAD:", updates);
+  throw e;
       alert("Unable to approve. Check Firestore rules / indexes.");
     }
   }
@@ -2260,6 +2268,7 @@ console.log("UPDATE PAYLOAD KEYS:", Object.keys(updates));
 </script>
 </body>
 </html>
+
 
 
 
