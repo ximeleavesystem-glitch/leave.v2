@@ -717,7 +717,7 @@ textarea:focus{
   import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
   import {
     getFirestore, doc, getDoc, collection, getDocs, query, where, updateDoc,
-    serverTimestamp, setDoc, Timestamp
+    serverTimestamp, setDoc, Timestamp, deleteField
   } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
   window.addEventListener("pageshow", (e) => {
@@ -844,7 +844,11 @@ textarea:focus{
   function normalizeEmail(v){ return String(v || "").trim().toLowerCase(); }
   function normalizeRollno(v){ return String(v || "").trim().toUpperCase(); }
 
-  const YEAR_TO_BATCH = { "1":"Batch 9", "2":"Batch 8" };
+  function clearCurrentFields(updates){
+    // ✅ DO NOT use null (rules usually break). Use empty strings.
+    updates.current = { holder_email:"", holder_role:"", stage:"" };
+    updates.current_holder_email = "";
+  }
 
   function showPage(which){
     [tabDashboard, tabRequests, tabHistory].forEach(x => x.classList.remove("active"));
@@ -872,12 +876,6 @@ textarea:focus{
     const d = new Date(`${dateStr}T23:59:59.999`);
     return isNaN(d) ? null : d;
   }
-  function dateRangeToTimestamps(fromDate, toDate){
-    const s = parseDateStart(fromDate);
-    const e = parseDateEnd(toDate);
-    if (!s || !e) return { start:null, end:null };
-    return { start: Timestamp.fromDate(s), end: Timestamp.fromDate(e) };
-  }
 
   function getOutDT(row){ return row.out_datetime || row.outDT || row.outDateTime || ""; }
   function getInDT(row){ return row.in_datetime || row.inDT || row.inDateTime || ""; }
@@ -890,39 +888,24 @@ textarea:focus{
     return isNaN(d) ? null : d;
   }
 
-  // ✅✅✅ FIX START: robust OUT-time calc (prevents wrong “change allowed” UI)
-  function getOutMs(row){
-    if (Number.isFinite(row?.out_ms)) return row.out_ms;
-
-    const outVal = getOutDT(row) || row?.out_time || row?.outTime || null;
-
-    // Firestore Timestamp
-    if (outVal && typeof outVal.toMillis === "function") return outVal.toMillis();
-
-    // Fallback (string/date)
-    const d = outVal ? new Date(outVal) : null;
-    return d && !isNaN(d) ? d.getTime() : null;
-  }
-
   function isBeforeOutTime(row){
-    const ms = getOutMs(row);
-    if (!ms) return false;
-    return Date.now() < ms;
+    const outVal = getOutDT(row);
+    const outD = toJSDate(outVal);
+    if (!outD) return false;
+    return new Date() < outD;
   }
-  // ✅✅✅ FIX END
 
- function isEscalatedLocked(row){
-  const st = String(row?.status || "").toLowerCase();
-  if (st === "pending_dean") return true;
+  function isEscalatedLocked(row){
+    const st = String(row?.status || "").toLowerCase();
+    if (st === "pending_dean") return true;
 
-  const esc = row?.escalation || {};
-  if (esc?.requested === true) return true;
+    const esc = row?.escalation || {};
+    if (esc?.requested === true) return true;
 
-  // 🔥 IMPORTANT: match Firestore rules
-  if (esc?.dean_action != null && String(esc.dean_action) !== "not_required") return true;
+    if (esc?.dean_action != null && String(esc.dean_action) !== "not_required") return true;
 
-  return false;
-}
+    return false;
+  }
 
   function getCurrentHolderEmail(row){
     return String(row?.current?.holder_email || row?.current_holder_email || row?.currentHolderEmail || row?.current_holder || "").trim();
@@ -976,7 +959,6 @@ textarea:focus{
     return `${h}h ${r}m`;
   }
 
-  // --- Arrival Status helpers for PDF ---
   function minutesToHM(mins){
     const m = Math.max(0, Math.floor(Number(mins) || 0));
     const h = Math.floor(m / 60);
@@ -1021,15 +1003,6 @@ textarea:focus{
     return s === "approved_final" || s === "approved_dean_final";
   }
 
-  function didIAct(chain){
-    const entry = chainEntryForMe(chain);
-    if (!entry) return null;
-    const st = String(entry.action || entry.status || "").toLowerCase();
-    if (st === "approved") return "approved";
-    if (st === "rejected") return "rejected";
-    return null;
-  }
-
   function chainEntryForMe(chain){
     const meLower = currentUserEmailLower;
     const meRaw = currentUserEmailRaw;
@@ -1038,6 +1011,15 @@ textarea:focus{
       const e = String(x?.email || "").trim();
       return e === meRaw || e.toLowerCase() === meLower;
     }) || null;
+  }
+
+  function didIAct(chain){
+    const entry = chainEntryForMe(chain);
+    if (!entry) return null;
+    const st = String(entry.action || entry.status || "").toLowerCase();
+    if (st === "approved") return "approved";
+    if (st === "rejected") return "rejected";
+    return null;
   }
 
   function isPendingForMe(row){
@@ -1102,6 +1084,8 @@ textarea:focus{
     if (rc === "weekend" || rc === "weekend leave") return true;
     return false;
   }
+
+  const YEAR_TO_BATCH = { "1":"Batch 9", "2":"Batch 8" };
 
   function computeCapabilitiesFromRoleDoc(d){
     bcYears = Array.isArray(d?.bc_years) ? d.bc_years.map(x => String(x)) : [];
@@ -1515,7 +1499,6 @@ textarea:focus{
   }
 
   function canChangeMyDecision(row){
-    // Must be something I acted on, must be BEFORE OUT time, and MUST NOT be escalated
     const myAct = didIAct(row.approver_chain);
     if (!myAct) return false;
     if (!isBeforeOutTime(row)) return false;
@@ -1577,7 +1560,7 @@ textarea:focus{
       const arrivalLine = computeArrivalStatusLine(r);
 
       const allowChange = canChangeMyDecision(r);
-      const myAction = didIAct(r.approver_chain); // approved / rejected
+      const myAction = didIAct(r.approver_chain);
       const changeRemarkId = `chg_remark_${r.id}`;
 
       const card = document.createElement("section");
@@ -1617,11 +1600,10 @@ textarea:focus{
       hydrateStudentPhoto(card, roll, studentName, r);
     }
 
-    // Wire change buttons
     historyContainer.querySelectorAll(".changeBtn").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
-        const action = btn.dataset.action; // approved/rejected
+        const action = btn.dataset.action;
         await handleChangeDecision(id, action);
       });
     });
@@ -1753,8 +1735,6 @@ textarea:focus{
       approver_chain: chain,
       approver_emails: (Array.isArray(r.approver_emails) ? r.approver_emails : []).length ? r.approver_emails : chain.map(x => normalizeEmail(x.email)).filter(Boolean),
       status: finalStatus,
-      current: { holder_email: null, holder_role: "", stage: "" },
-      current_holder_email: null,
       updated_at: serverTimestamp(),
       updatedAt: serverTimestamp(),
       escalation: {
@@ -1763,6 +1743,7 @@ textarea:focus{
         dean_action: "not_required"
       }
     };
+    clearCurrentFields(updates);
 
     try{
       await updateDoc(doc(db, "leave_requests", requestId), updates);
@@ -1779,7 +1760,7 @@ textarea:focus{
       renderHistory();
     }catch(e){
       console.error(e);
-      alert("Unable to change decision. Check Firestore rules.");
+      alert(`Unable to change decision.\n\n${e?.code || ""}\n${e?.message || e}`);
     }
   }
 
@@ -1807,17 +1788,15 @@ textarea:focus{
 
     if (holderRole === "dean" || st === "pending_dean"){
       updates.status = "approved_dean_final";
-      updates.current = { holder_email: null, holder_role: "", stage: "" };
-      updates.current_holder_email = null;
       updates.escalation = { ...(r.escalation || {}), dean_action: "approved" };
+      clearCurrentFields(updates);
       finalApproved = true;
 
     } else {
       if (holderRole === "warden") {
         updates.status = "approved_final";
-        updates.current = { holder_email: null, holder_role: "", stage: "" };
-        updates.current_holder_email = null;
         updates.escalation = { ...(r.escalation || {}), requested: false, dean_action: "not_required" };
+        clearCurrentFields(updates);
         finalApproved = true;
 
       } else {
@@ -1843,9 +1822,8 @@ textarea:focus{
 
         } else {
           updates.status = "approved_final";
-          updates.current = { holder_email: null, holder_role: "", stage: "" };
-          updates.current_holder_email = null;
           updates.escalation = { ...(r.escalation || {}), requested: false, dean_action: "not_required" };
+          clearCurrentFields(updates);
           finalApproved = true;
         }
       }
@@ -1864,7 +1842,7 @@ textarea:focus{
       console.error("UPDATE FAILED:", e.code, e.message);
       console.error("FAILED PAYLOAD KEYS:", Object.keys(updates));
       console.error("FAILED PAYLOAD:", updates);
-      alert("Unable to approve. Check Firestore rules / indexes.");
+      alert(`Unable to approve.\n\n${e?.code || ""}\n${e?.message || e}`);
     }
   }
 
@@ -1884,10 +1862,9 @@ textarea:focus{
       approver_chain: chain,
       approver_emails: (Array.isArray(r.approver_emails) ? r.approver_emails : []).length ? r.approver_emails : chain.map(x => normalizeEmail(x.email)).filter(Boolean),
       updated_at: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-      current: { holder_email: null, holder_role: "", stage: "" },
-      current_holder_email: null
+      updatedAt: serverTimestamp()
     };
+    clearCurrentFields(updates);
 
     if (holderRole === "dean" || st === "pending_dean"){
       updates.status = "rejected_dean";
@@ -1908,7 +1885,7 @@ textarea:focus{
       console.error("UPDATE FAILED:", e.code, e.message);
       console.error("FAILED PAYLOAD KEYS:", Object.keys(updates));
       console.error("FAILED PAYLOAD:", updates);
-      alert("Unable to reject. Check Firestore rules / indexes.");
+      alert(`Unable to reject.\n\n${e?.code || ""}\n${e?.message || e}`);
     }
   }
 
@@ -2013,17 +1990,13 @@ textarea:focus{
     repToast.textContent = "";
   });
 
-  // (Report functions unchanged below in your original — kept as-is)
-  // For brevity, I left them intact from your pasted code.
-
-  // ===== Auth boot (✅ FIXED) =====
+  // ===== Auth boot =====
   onAuthStateChanged(auth, async (u) => {
     if (!u){
       window.location.replace("../index.html");
       return;
     }
 
-    // ✅ this is the correct placement of the setDoc users/{uid} patch
     try{
       await setDoc(doc(db, "users", u.uid), {
         email: String(u.email || "").trim(),
