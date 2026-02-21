@@ -1927,7 +1927,10 @@ console.log("OUT:", r.out_datetime);
       renderPendingRequests();
       renderHistory();
     }catch(e){
-      console.error(e);
+     console.error("UPDATE FAILED:", e.code, e.message);
+  console.error("FAILED PAYLOAD KEYS:", Object.keys(updates));
+  console.error("FAILED PAYLOAD:", updates);
+  throw e;
       alert("Unable to reject. Check Firestore rules / indexes.");
     }
   }
@@ -2268,6 +2271,7 @@ console.log("OUT:", r.out_datetime);
 </script>
 </body>
 </html>
+
 
 
 
