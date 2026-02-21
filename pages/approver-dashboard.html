@@ -427,6 +427,8 @@ textarea:focus{
 .approveBtn{ background: linear-gradient(135deg, var(--good), #14b8a6); }
 .rejectBtn{ background: linear-gradient(135deg, var(--bad), #ff3b3b); }
 
+.changeBtn{ background: linear-gradient(135deg, #334155, #0f172a); }
+
 .inlineOpt{
   display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   padding:10px 12px; border-radius:16px; border:1px dashed rgba(193,18,31,.3);
@@ -438,7 +440,6 @@ textarea:focus{
 .inlineOpt input{ width:auto; }
 .smallNote{ font-size:12px; color:var(--muted); font-weight:850; margin-top:8px; line-height:1.4; }
 
-/* New note for immutability */
 .finalNote{
   margin-top:10px;
   padding:10px 12px;
@@ -599,7 +600,7 @@ textarea:focus{
 
     <div class="smallNote">
       This page shows only <b>pending requests assigned to you</b>.  
-      Escalation to Dean can be selected while approving.
+      Escalation to Dean can be selected while approving (Warden / Batch Coordinator).
     </div>
 
     <div id="requestsContainer"></div>
@@ -832,7 +833,6 @@ textarea:focus{
   function normalizeRollno(v){ return String(v || "").trim().toUpperCase(); }
 
   function clearCurrentFields(updates){
-    // ✅ DO NOT use null (rules usually break). Use empty strings.
     updates.current = { holder_email:"", holder_role:"", stage:"" };
     updates.current_holder_email = "";
   }
@@ -895,6 +895,12 @@ textarea:focus{
     return true;
   }
 
+  function isBeforeOutTime(row){
+    const outDate = toJSDate(getOutDT(row));
+    if (!outDate) return false;
+    return Date.now() < outDate.getTime();
+  }
+
   function fmtDT(val){
     const dt = toJSDate(val);
     if (!dt) return "-";
@@ -920,15 +926,6 @@ textarea:focus{
 
   function formatLateMinutes(mins){
     const m = Math.max(0, Number(mins) || 0);
-    const h = Math.floor(m / 60);
-    const r = m % 60;
-    if (h <= 0) return `${r}m`;
-    if (r === 0) return `${h}h`;
-    return `${h}h ${r}m`;
-  }
-
-  function minutesToHM(mins){
-    const m = Math.max(0, Math.floor(Number(mins) || 0));
     const h = Math.floor(m / 60);
     const r = m % 60;
     if (h <= 0) return `${r}m`;
@@ -1018,9 +1015,7 @@ textarea:focus{
 
   function isWeekendReason(row){
     const rc = getReasonCat(row);
-    if (rc === "weekend_leave") return true;
-    if (rc === "weekend" || rc === "weekend leave") return true;
-    return false;
+    return (rc === "weekend_leave" || rc === "weekend" || rc === "weekend leave");
   }
 
   function computeCapabilitiesFromRoleDoc(d){
@@ -1279,7 +1274,6 @@ textarea:focus{
     const pending = rows.filter(r => isPendingForMe(r)).length;
     const approved = rows.filter(r => didIAct(r.approver_chain) === "approved").length;
     const rejected = rows.filter(r => didIAct(r.approver_chain) === "rejected").length;
-
     const weekend = rows.filter(r => isWeekendReason(r)).length;
 
     mTotal.textContent = String(total);
@@ -1328,8 +1322,8 @@ textarea:focus{
 
       const holderRole = getCurrentHolderRole(r).toLowerCase();
 
-      // ONLY Batch Coordinator can escalate (warden cannot)
-      const canEscalate = (holderRole === "batch_coordinator") && !!(r.routing && r.routing.dean_email);
+      // ✅ NOW: Warden OR Batch Coordinator can escalate (if dean email exists)
+      const canEscalate = (holderRole === "batch_coordinator" || holderRole === "warden") && !!(r.routing && r.routing.dean_email);
 
       const remarkId = `remark_${r.id}`;
       const escId = `esc_${r.id}`;
@@ -1487,6 +1481,18 @@ textarea:focus{
 
       const arrivalLine = computeArrivalStatusLine(r);
 
+      // ✅ Reversible decision rules:
+      // - Only in Approved/Rejected tabs
+      // - Only if I acted
+      // - Only if out time not crossed
+      // - Only if NOT already escalated
+      const iActed = didIAct(r.approver_chain);
+      const canChange =
+        (activeHistoryTab === "approved" || activeHistoryTab === "rejected") &&
+        !!iActed &&
+        isBeforeOutTime(r) &&
+        !(r?.escalation?.requested);
+
       const card = document.createElement("section");
       card.className = "requestCard";
       card.innerHTML = `
@@ -1509,11 +1515,24 @@ textarea:focus{
           <div class="kv reasonBox"><div class="k">REASON</div><div class="v">${reasonLine || "-"}</div></div>
         </div>
 
-        <div class="finalNote">🔒 Decision is final once Approved/Rejected. Changes are not allowed.</div>
+        ${canChange ? `
+          <div class="actions">
+            <button class="actionBtn changeBtn" data-id="${r.id}" type="button">Change Decision</button>
+          </div>
+          <div class="finalNote">
+            ♻️ You can change your decision only until the OUT time. After OUT time, it becomes locked.
+          </div>
+        ` : `
+          <div class="finalNote">🔒 Decision is locked after OUT time. (No changes allowed once OUT time is crossed.)</div>
+        `}
       `;
       historyContainer.appendChild(card);
       hydrateStudentPhoto(card, roll, studentName, r);
     }
+
+    historyContainer.querySelectorAll(".changeBtn").forEach(btn => {
+      btn.addEventListener("click", () => handleChangeDecision(btn.dataset.id));
+    });
   }
 
   function updateHistoryCounts(){
@@ -1640,39 +1659,33 @@ textarea:focus{
       finalApproved = true;
 
     } else {
-      if (holderRole === "warden") {
+      const deanEmail = r?.routing?.dean_email || "";
+      const escEl = document.getElementById(`esc_${requestId}`);
+      const wantEsc = !!(escEl && escEl.checked);
+
+      // ✅ Warden OR BC can escalate now
+      if ((holderRole === "warden" || holderRole === "batch_coordinator") && wantEsc && deanEmail){
+        chain = ensureDeanStage(chain, deanEmail);
+        updates.approver_chain = chain;
+
+        updates.status = "pending_dean";
+        updates.current = { holder_email: normalizeEmail(deanEmail), holder_role: "dean", stage: "DEAN" };
+        updates.current_holder_email = normalizeEmail(deanEmail);
+
+        updates.escalation = {
+          ...(r.escalation || {}),
+          requested: true,
+          requested_by: currentUserEmailLower,
+          requested_at: serverTimestamp(),
+          reason: ""
+        };
+
+      } else {
+        // ✅ normal final approval at L1
         updates.status = "approved_final";
         updates.escalation = { ...(r.escalation || {}), requested: false, dean_action: "not_required" };
         clearCurrentFields(updates);
         finalApproved = true;
-
-      } else {
-        const deanEmail = r?.routing?.dean_email || "";
-        const escEl = document.getElementById(`esc_${requestId}`);
-        const wantEsc = !!(escEl && escEl.checked);
-
-        if (wantEsc && deanEmail){
-          chain = ensureDeanStage(chain, deanEmail);
-          updates.approver_chain = chain;
-
-          updates.status = "pending_dean";
-          updates.current = { holder_email: normalizeEmail(deanEmail), holder_role: "dean", stage: "DEAN" };
-          updates.current_holder_email = normalizeEmail(deanEmail);
-
-          updates.escalation = {
-            ...(r.escalation || {}),
-            requested: true,
-            requested_by: currentUserEmailLower,
-            requested_at: serverTimestamp(),
-            reason: ""
-          };
-
-        } else {
-          updates.status = "approved_final";
-          updates.escalation = { ...(r.escalation || {}), requested: false, dean_action: "not_required" };
-          clearCurrentFields(updates);
-          finalApproved = true;
-        }
       }
     }
 
@@ -1733,6 +1746,66 @@ textarea:focus{
       console.error("FAILED PAYLOAD KEYS:", Object.keys(updates));
       console.error("FAILED PAYLOAD:", updates);
       alert(`Unable to reject.\n\n${e?.code || ""}\n${e?.message || e}`);
+    }
+  }
+
+  // ===== Change Decision (History) =====
+  async function handleChangeDecision(requestId){
+    const r = cacheAllForApprover.find(x => x.id === requestId);
+    if (!r) return;
+
+    // hard rules
+    if (!didIAct(r.approver_chain)) return;
+    if (!isBeforeOutTime(r)) return;
+    if (r?.escalation?.requested) {
+      alert("This request is already escalated to Dean. Decision change is not allowed.");
+      return;
+    }
+
+    const currentAction = didIAct(r.approver_chain); // approved/rejected
+    const newAction = (currentAction === "approved") ? "rejected" : "approved";
+
+    const ok = confirm(`Change your decision?\n\nCurrent: ${currentAction.toUpperCase()}\nNew: ${newAction.toUpperCase()}\n\nAllowed only until OUT time.`);
+    if (!ok) return;
+
+    const chain0 = Array.isArray(r.approver_chain) ? r.approver_chain : [];
+    const chain = markMyChainAction(chain0, newAction, `Decision changed from ${currentAction} to ${newAction}`);
+
+    const updates = {
+      approver_chain: chain,
+      approver_emails: (Array.isArray(r.approver_emails) ? r.approver_emails : []).length ? r.approver_emails : chain.map(x => normalizeEmail(x.email)).filter(Boolean),
+      updated_at: serverTimestamp(),
+      updatedAt: serverTimestamp()
+    };
+
+    // Only handle L1 final statuses here (safe + clean)
+    if (newAction === "approved"){
+      updates.status = "approved_final";
+      updates.escalation = { ...(r.escalation || {}), requested: false, dean_action: "not_required" };
+      clearCurrentFields(updates);
+    } else {
+      updates.status = "rejected_l1";
+      updates.escalation = { ...(r.escalation || {}), requested: false, dean_action: "not_required" };
+      clearCurrentFields(updates);
+    }
+
+    try{
+      await updateDoc(doc(db, "leave_requests", requestId), updates);
+
+      // gatepass public sync
+      if (newAction === "approved"){
+        await upsertPublicGatepass(requestId, { ...r, ...updates });
+      } else {
+        await revokePublicGatepass(requestId, "rejected");
+      }
+
+      await refreshCache();
+      computeDashboardMetrics();
+      renderHistory();
+    }catch(e){
+      console.error("CHANGE DECISION FAILED:", e.code, e.message);
+      console.error("FAILED PAYLOAD:", updates);
+      alert(`Unable to change decision.\n\n${e?.code || ""}\n${e?.message || e}`);
     }
   }
 
