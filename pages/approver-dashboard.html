@@ -890,12 +890,26 @@ textarea:focus{
     return isNaN(d) ? null : d;
   }
 
-  function isBeforeOutTime(row){
-    const outVal = getOutDT(row);
-    const outD = toJSDate(outVal);
-    if (!outD) return false;
-    return new Date() < outD;
+  // ✅✅✅ FIX START: robust OUT-time calc (prevents wrong “change allowed” UI)
+  function getOutMs(row){
+    if (Number.isFinite(row?.out_ms)) return row.out_ms;
+
+    const outVal = getOutDT(row) || row?.out_time || row?.outTime || null;
+
+    // Firestore Timestamp
+    if (outVal && typeof outVal.toMillis === "function") return outVal.toMillis();
+
+    // Fallback (string/date)
+    const d = outVal ? new Date(outVal) : null;
+    return d && !isNaN(d) ? d.getTime() : null;
   }
+
+  function isBeforeOutTime(row){
+    const ms = getOutMs(row);
+    if (!ms) return false;
+    return Date.now() < ms;
+  }
+  // ✅✅✅ FIX END
 
  function isEscalatedLocked(row){
   const st = String(row?.status || "").toLowerCase();
@@ -2062,4 +2076,3 @@ textarea:focus{
 </script>
 </body>
 </html>
-
