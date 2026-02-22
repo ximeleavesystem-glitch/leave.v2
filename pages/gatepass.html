@@ -443,11 +443,10 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
- <script type="module">
+<script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
 import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
 import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
-import { getStorage, ref as sRef, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-storage.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDgoq2rMU5kiKcz_27-hjBzd8rxS8yQqdY",
@@ -461,7 +460,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
 
 const mount = document.getElementById("mount");
 const toast = document.getElementById("toast");
@@ -483,11 +481,10 @@ function normalizeRoll(v){ return String(v||"").trim().toUpperCase(); }
 function toJSDate(x){
   if (!x) return null;
   if (x instanceof Date) return x;
-  if (typeof x?.toDate === "function") return x.toDate();
+  if (typeof x?.toDate === "function") return x.toDate(); // Firestore Timestamp
   const d = new Date(x);
   return isNaN(d) ? null : d;
 }
-
 function fmtDateOnly(d){
   const dt = toJSDate(d);
   if (!dt) return "-";
@@ -510,13 +507,12 @@ function isApprovedStatus(status){
 }
 
 function isExpiredFromData(data){
-  const inD = toJSDate(data?.in_datetime || data?.inDateTime || data?.in_time || null);
+  const inD = toJSDate(data?.in_datetime || null);
   if (!inD) return false;
   return new Date() > inD;
 }
-
 function isBeforeOutFromData(data){
-  const outD = toJSDate(data?.out_datetime || data?.outDateTime || data?.out_time || null);
+  const outD = toJSDate(data?.out_datetime || null);
   if (!outD) return false;
   return new Date() < outD;
 }
@@ -530,77 +526,86 @@ function initials(name){
   return (a + b || a || "GP").toUpperCase();
 }
 
-/** ✅ FIX: Approved-by extraction (works with many field styles) */
-function approvedByLine(r){
+/* ---------- ✅ APPROVED BY (from gatepass_public OR fallback to leave_requests) ---------- */
+function approvedByFromAnyDoc(r){
   const email =
     r?.approved_by_email ||
     r?.final_approved_by_email ||
+    r?.approvedByEmail ||
     r?.finalApprovedByEmail ||
-    r?.finalApprovedBy?.email ||
     "";
-
   const role =
     r?.approved_by_role ||
     r?.final_approved_by_role ||
+    r?.approvedByRole ||
     r?.finalApprovedByRole ||
-    r?.finalApprovedBy?.role ||
     "";
 
-  if (email || role){
-    return `${email || "—"}${role ? ` (${role})` : ""}`;
-  }
+  if (email || role) return `${email || "—"}${role ? ` (${role})` : ""}`;
 
   const chain = r?.approver_chain || r?.approverChain || [];
   if (Array.isArray(chain) && chain.length){
-    // try find last approved action first
-    const approvedOne = [...chain].reverse().find(x =>
+    const lastApproved = [...chain].reverse().find(x =>
       String(x?.action || x?.status || "").toLowerCase().includes("approved")
     ) || chain[chain.length - 1];
 
-    const e = approvedOne?.email || approvedOne?.approver_email || approvedOne?.approved_by_email || "";
-    const rr = approvedOne?.role || approvedOne?.approver_role || approvedOne?.approved_by_role || "";
+    const e = lastApproved?.email || lastApproved?.approver_email || lastApproved?.approved_by_email || "";
+    const rr = lastApproved?.role || lastApproved?.approver_role || lastApproved?.approved_by_role || "";
     return `${e || "—"}${rr ? ` (${rr})` : ""}`;
   }
 
   return "—";
 }
 
-/** ✅ FIX: Photo URL resolution
- * Supports:
- * - student_photo_url (direct)
- * - student_photo_path (Firebase Storage path)
- */
-async function resolvePhotoUrl(r){
-  const direct =
-    r?.student_photo_url ||
-    r?.photo_url ||
-    r?.photoURL ||
-    r?.studentPhotoUrl ||
-    "";
-
-  if (direct && /^https?:\/\//i.test(direct)) return direct;
-
-  const path =
-    r?.student_photo_path ||
-    r?.photo_path ||
-    r?.studentPhotoPath ||
-    "";
-
-  if (path){
-    try{
-      const url = await getDownloadURL(sRef(storage, path));
-      return url;
-    }catch(e){
-      // If Storage rules block public access, it’ll fail here.
-      return "";
-    }
+async function fetchApprovedByFallback(id){
+  try{
+    // This is where your approver_chain usually lives
+    const reqSnap = await getDoc(doc(db, "leave_requests", id));
+    if (!reqSnap.exists()) return null;
+    return approvedByFromAnyDoc(reqSnap.data() || {});
+  }catch(e){
+    return null;
   }
-  return "";
 }
 
-/** ✅ NEW: Minimal QR text (no out/in/reason) */
+/* ---------- ✅ PHOTO URL: handle Google Drive hotlink issues ---------- */
+function extractDriveId(url){
+  // handles ...uc?export=view&id=FILEID
+  try{
+    const u = new URL(url);
+    const id = u.searchParams.get("id");
+    if (id) return id;
+  }catch(_){}
+  // handles .../file/d/FILEID/view
+  const m = String(url).match(/\/d\/([a-zA-Z0-9_-]{10,})/);
+  return m ? m[1] : "";
+}
+
+function driveFallbackUrls(original){
+  const id = extractDriveId(original);
+  if (!id) return [original];
+  // thumbnail + googleusercontent are far more reliable in <img>
+  return [
+    original,
+    `https://drive.google.com/thumbnail?id=${id}&sz=w800`,
+    `https://lh3.googleusercontent.com/d/${id}=w800`
+  ];
+}
+
+async function tryLoadImage(imgEl, urls){
+  for (const u of urls){
+    const ok = await new Promise((resolve) => {
+      imgEl.onload = () => resolve(true);
+      imgEl.onerror = () => resolve(false);
+      imgEl.src = u;
+    });
+    if (ok) return true;
+  }
+  return false;
+}
+
+/* ---------- ✅ MINIMAL QR text ---------- */
 function buildMinimalQrText({name, roll, room, statusText, approvedBy}){
-  // Keep it readable for any QR scanner
   const safe = (v) => String(v||"").replace(/\s+/g," ").trim();
   return [
     "XIME_GATEPASS",
@@ -612,6 +617,27 @@ function buildMinimalQrText({name, roll, room, statusText, approvedBy}){
   ].join(" | ");
 }
 
+function renderQR(qrText){
+  const qrEl = document.getElementById("qrHere");
+  if (!qrEl) return;
+
+  qrEl.innerHTML = "";
+
+  // if QRCode library is missing, show text fallback (so security still can read)
+  if (!window.QRCode){
+    qrEl.innerHTML = `
+      <div style="font-weight:900;font-size:11px;line-height:1.35;color:#111827;word-break:break-word;max-width:160px;text-align:center">
+        ${qrText}
+      </div>
+    `;
+    setToast("QR library not loaded (CDN blocked). Showing text instead.", "warn");
+    return;
+  }
+
+  new window.QRCode(qrEl, { text: qrText, width: 150, height: 150 });
+}
+
+/* ---------- Load gatepass_public ---------- */
 async function loadGatepassPublic(id){
   const snap = await getDoc(doc(db, "gatepass_public", id));
   if (!snap.exists()){
@@ -626,16 +652,13 @@ async function loadGatepassPublic(id){
   return { id, ...data };
 }
 
-/** ✅ Render UI (keep your designed layout on page)
- * BUT QR is minimal text only.
- */
-async function renderGatepass(r){
+/* ---------- Render UI ---------- */
+async function renderGatepass(r, approvedByText){
   clearToast();
 
-  const roll = normalizeRoll(r.student_rollno || r.student_roll || r.rollno || "");
-  const room = r.student_room_no || r.room_no || r.room || "—";
-  const name = r.student_name || r.name || "Student";
-  const approvedBy = approvedByLine(r);
+  const roll = normalizeRoll(r.student_rollno || "");
+  const room = r.student_room_no || "—";
+  const name = r.student_name || "Student";
 
   const beforeOut = !!r.__before_out;
   const expired = !!r.__expired;
@@ -666,7 +689,7 @@ async function renderGatepass(r){
             <div><b>${roll || "—"}</b> • Room <b>${room}</b></div>
             <div style="margin-top:4px">
               <span style="color:#111827">Approved by:</span>
-              <b id="approvedByText">${approvedBy}</b>
+              <b id="approvedByText">${approvedByText || "—"}</b>
             </div>
           </div>
         </div>
@@ -716,37 +739,45 @@ async function renderGatepass(r){
     </div>
   `;
 
-  // ✅ Photo
+  // ✅ PHOTO render with Drive fallbacks + no-referrer
   const img = document.getElementById("gpPhoto");
   const av = document.getElementById("gpAvatar");
-  const photoUrl = await resolvePhotoUrl(r);
+  const photoUrl = r.photo_url || r.student_photo_url || "";
+
+  if (img){
+    img.referrerPolicy = "no-referrer";
+    img.crossOrigin = "anonymous";
+  }
 
   if (photoUrl && img){
-    img.src = photoUrl;
-    img.style.display = "block";
-    if (av) av.style.display = "none";
-    img.onerror = () => { img.style.display="none"; if (av) av.style.display="grid"; };
+    const urls = driveFallbackUrls(photoUrl);
+    const loaded = await tryLoadImage(img, urls);
+
+    if (loaded){
+      img.style.display = "block";
+      if (av) av.style.display = "none";
+    } else {
+      img.style.display = "none";
+      if (av) av.style.display = "grid";
+      setToast("Photo link is not publicly viewable (Drive hotlink blocked).", "warn");
+    }
   } else {
     if (img) img.style.display = "none";
     if (av) av.style.display = "grid";
   }
 
-  // ✅ Minimal QR text (no in/out/reason inside QR)
+  // ✅ Minimal QR
   const qrText = buildMinimalQrText({
     name,
     roll,
     room,
     statusText: stampText,
-    approvedBy
+    approvedBy: approvedByText || "—"
   });
-
-  const qrEl = document.getElementById("qrHere");
-  if (qrEl){
-    qrEl.innerHTML = "";
-    new QRCode(qrEl, { text: qrText, width: 150, height: 150 });
-  }
+  renderQR(qrText);
 }
 
+/* ---------- MAIN ---------- */
 onAuthStateChanged(auth, async (u) => {
   const id = getIdFromURL();
   if (!id){
@@ -760,11 +791,20 @@ onAuthStateChanged(auth, async (u) => {
   gp.__expired = isExpiredFromData(gp);
   gp.__before_out = isBeforeOutFromData(gp);
 
-  // Public view allowed (no login) — but we still render UI
+  // Approved-by from gatepass_public (will be — for your current schema)
+  let approvedByText = approvedByFromAnyDoc(gp);
+
+  // If logged in, fetch fallback from leave_requests
+  if (u && (approvedByText === "—")){
+    const fallback = await fetchApprovedByFallback(id);
+    if (fallback) approvedByText = fallback;
+  }
+
+  // Public view: allow, but hide back/logout (as before)
   if (!u){
     logoutBtn.style.display="none";
     backBtn.style.display="none";
-    await renderGatepass(gp);
+    await renderGatepass(gp, approvedByText);
     return;
   }
 
@@ -777,10 +817,15 @@ onAuthStateChanged(auth, async (u) => {
     return;
   }
 
-  await renderGatepass(gp);
+  await renderGatepass(gp, approvedByText);
 
   if (!gp.__expired && gp.__before_out){
     setToast("Gatepass activates after OUT time.", "warn");
+  }
+
+  // If still —, your schema is missing approved-by snapshot
+  if (approvedByText === "—"){
+    setToast("Approved-by missing in gatepass_public. Add approved_by_email/role during generation.", "warn");
   }
 });
 
@@ -795,3 +840,4 @@ backBtn.addEventListener("click", ()=>{
 </script>
 </body>
 </html>
+
