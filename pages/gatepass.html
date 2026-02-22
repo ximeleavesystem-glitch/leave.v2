@@ -433,586 +433,184 @@
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
-    import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
-    import {
-      getFirestore, doc, getDoc,
-      collection, getDocs, query, where, limit
-    } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
+ <!-- ONLY SCRIPT SECTION CHANGED BELOW -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
+import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
+import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
-    // ✅ bfcache fix (back button after logout)
-    window.addEventListener("pageshow", (e) => {
-      if (e.persisted) window.location.reload();
-    });
+const firebaseConfig = {
+  apiKey: "AIzaSyDgoq2rMU5kiKcz_27-hjBzd8rxS8yQqdY",
+  authDomain: "xime-leave-system-b25a4.firebaseapp.com",
+  projectId: "xime-leave-system-b25a4",
+  storageBucket: "xime-leave-system-b25a4.firebasestorage.app",
+  messagingSenderId: "802112635142",
+  appId: "1:802112635142:web:0fd0f5ad1ae3ef8eb4de87"
+};
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyDgoq2rMU5kiKcz_27-hjBzd8rxS8yQqdY",
-      authDomain: "xime-leave-system-b25a4.firebaseapp.com",
-      projectId: "xime-leave-system-b25a4",
-      storageBucket: "xime-leave-system-b25a4.firebasestorage.app",
-      messagingSenderId: "802112635142",
-      appId: "1:802112635142:web:0fd0f5ad1ae3ef8eb4de87"
-    };
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
 
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
+const mount = document.getElementById("mount");
+const toast = document.getElementById("toast");
+const logoutBtn = document.getElementById("logoutBtn");
+const backBtn = document.getElementById("backBtn");
 
-    const backBtn = document.getElementById("backBtn");
-    const logoutBtn = document.getElementById("logoutBtn");
-    const toast = document.getElementById("toast");
-    const mount = document.getElementById("mount");
+function showToast(msg){
+  toast.className = "toast show bad";
+  toast.textContent = msg;
+}
 
-    // ✅ logo fallback
-    const ximeLogo = document.getElementById("ximeLogo");
-    ximeLogo?.addEventListener("error", () => {
-      if (!ximeLogo.dataset.try2){
-        ximeLogo.dataset.try2 = "1";
-        ximeLogo.src = "../assets/img/xime-logo.jpg";
-        return;
-      }
-      ximeLogo.style.display = "none";
-    });
+function normalizeEmail(v){ return String(v||"").trim().toLowerCase(); }
+function normalizeRoll(v){ return String(v||"").trim().toUpperCase(); }
 
-    function showToast(msg){
-      toast.className = "toast show bad";
-      toast.textContent = msg;
-    }
+function toJSDate(x){
+  if (!x) return null;
+  if (x instanceof Date) return x;
+  if (typeof x?.toDate === "function") return x.toDate();
+  const d = new Date(x);
+  return isNaN(d) ? null : d;
+}
 
-    function normalizeEmail(v){ return String(v || "").trim().toLowerCase(); }
-    function normalizeRoll(v){ return String(v || "").trim().toUpperCase(); }
+function fmtDateOnly(d){
+  const dt = toJSDate(d);
+  if (!dt) return "-";
+  return dt.toLocaleDateString("en-GB");
+}
 
-    // ✅ Timestamp/Date/string safe
-    function toJSDate(x){
-      if (!x) return null;
-      if (x instanceof Date) return x;
-      if (typeof x?.toDate === "function") return x.toDate();          // Firestore Timestamp
-      if (typeof x?.toMillis === "function") return new Date(x.toMillis());
-      const d = new Date(x);
-      return isNaN(d) ? null : d;
-    }
+function fmtTimeOnly(d){
+  const dt = toJSDate(d);
+  if (!dt) return "-";
+  return dt.toLocaleTimeString("en-IN",{hour:"2-digit",minute:"2-digit"});
+}
 
-    function fmtDateOnly(d){
-      const dt = toJSDate(d);
-      if (!dt) return "-";
-      const dd = String(dt.getDate()).padStart(2, "0");
-      const mm = String(dt.getMonth() + 1).padStart(2, "0");
-      const yyyy = dt.getFullYear();
-      return `${dd}/${mm}/${yyyy}`;
-    }
+function getIdFromURL(){
+  const u = new URL(location.href);
+  return u.searchParams.get("id") || "";
+}
 
-    function fmtTimeOnly(d){
-      const dt = toJSDate(d);
-      if (!dt) return "-";
-      let hh = dt.getHours();
-      const min = String(dt.getMinutes()).padStart(2, "0");
-      const ampm = hh >= 12 ? "PM" : "AM";
-      hh = hh % 12; hh = hh ? hh : 12;
-      hh = String(hh).padStart(2, "0");
-      return `${hh}:${min} ${ampm}`;
-    }
-
-    function initials(name){
-      const n = String(name||"").trim();
-      if (!n) return "ST";
-      const parts = n.split(/\s+/).filter(Boolean);
-      const a = parts[0]?.[0] || "S";
-      const b = parts.length > 1 ? (parts[parts.length-1]?.[0] || "") : (parts[0]?.[1] || "");
-      return (a + b).toUpperCase();
-    }
-
-    function extractDriveId(url){
-      const u = String(url || "").trim();
-      if (!u) return "";
-      const m1 = u.match(/drive\.google\.com\/file\/d\/([^\/]+)\//);
-      if (m1 && m1[1]) return m1[1];
-      const m2 = u.match(/[?&]id=([^&]+)/);
-      if (m2 && m2[1]) return m2[1];
-      const m3 = u.match(/uc\?export=view&id=([^&]+)/);
-      if (m3 && m3[1]) return m3[1];
-      return "";
-    }
-
-    function resolveDriveUrls(rawLink){
-      const id = extractDriveId(rawLink);
-      if (!id) return { primary: rawLink, fallback: "" };
-      const primary = `https://lh3.googleusercontent.com/d/${id}=w1000`;
-      const fallback = `https://drive.google.com/uc?export=view&id=${id}`;
-      return { primary, fallback };
-    }
-
-    function resolvePhotoURL(obj){
-      const raw =
-        obj?.photo_url ||
-        obj?.photoUrl ||
-        obj?.photoURL ||
-        obj?.photo ||
-        obj?.photoLink ||
-        obj?.imageUrl ||
-        obj?.imageURL ||
-        obj?.student_photo_url ||
-        "";
-      const link = String(raw || "").trim();
-      if (!link) return { primary:"", fallback:"" };
-
-      if (link.includes("drive.google.com") || link.includes("googleusercontent.com")){
-        return resolveDriveUrls(link);
-      }
-      if (link.startsWith("http://") || link.startsWith("https://")){
-        return { primary: link, fallback: "" };
-      }
-      return { primary:"", fallback:"" };
-    }
-
-    // ✅ Canonical QR link (origin + same page path + id param)
-    function buildQrLink(id){
-      const url = new URL(window.location.origin + window.location.pathname);
-      url.searchParams.set("id", id);
-      return url.toString();
-    }
-
-    function getIdFromURL(){
-      const u = new URL(location.href);
-      return u.searchParams.get("id") || "";
-    }
-
-    // ✅ expired = NOW > planned IN time
-    function isExpiredFromData(data){
-      const inVal =
-        data?.in_datetime ??
-        data?.in_datetime_ts ??
-        data?.inDT ??
-        data?.inDateTime ??
-        data?.in_datetime_iso ??
-        null;
-
-      const inD = toJSDate(inVal);
-      if (!inD) return false;
-      return new Date() > inD;
-    }
-
-    // ✅ not yet started = NOW < planned OUT time
-    function isBeforeOutFromData(data){
-      const outVal =
-        data?.out_datetime ??
-        data?.out_datetime_ts ??
-        data?.outDT ??
-        data?.outDateTime ??
-        data?.out_datetime_iso ??
-        null;
-
-      const outD = toJSDate(outVal);
-      if (!outD) return false; // if out time missing, don’t block
-      return new Date() < outD;
-    }
-
-    function buildReasonLine(r){
-      const reason =
-        (r?.reason != null ? String(r.reason) : "") ||
-        (r?.reason_text != null ? String(r.reason_text) : "") ||
-        (r?.reasonText != null ? String(r.reasonText) : "") ||
-        "";
-      const cat =
-        (r?.reason_category != null ? String(r.reason_category) : "") ||
-        (r?.reasonCategory != null ? String(r.reasonCategory) : "") ||
-        "";
-      const a = cat.trim();
-      const b = reason.trim();
-      if (a && b) return `${a} — ${b}`;
-      return (b || a || "—");
-    }
 function approvedByLine(r){
-  // prefer what we fetched from gatepasses
-  const fetched = String(r?.__approved_by || "").trim();
-  if (fetched) return fetched;
-
-  // fallback to any direct fields (if you later add them into gatepass_public)
-  const byEmail =
-    r?.final_approved_by_email ||
-    r?.approved_by_email ||
-    r?.approved_by ||
-    r?.finalApprovedByEmail ||
-    "";
-  const byRole =
-    r?.final_approved_by_role ||
-    r?.approved_by_role ||
-    r?.finalApprovedByRole ||
-    "";
-
-  const e = String(byEmail || "").trim();
-  const role = String(byRole || "").trim();
-  if (e && role) return `${e} (${role})`;
-  return (e || role || "—");
+  const email = r?.final_approved_by_email || "";
+  const role  = r?.final_approved_by_role || "";
+  if (email && role) return `${email} (${role})`;
+  return email || role || "—";
 }
-  
 
-   async function tryFetchApproverInfo(leaveRequestId){
-  try{
-    const q = query(
-      collection(db, "gatepasses"),
-      where("leave_request_id", "==", leaveRequestId),
-      limit(1)
-    );
-    const snap = await getDocs(q);
-    if (snap.empty) return "";
+function isExpiredFromData(data){
+  const inVal = data?.in_datetime || null;
+  const inD = toJSDate(inVal);
+  if (!inD) return false;
+  return new Date() > inD;
+}
 
-    const gp = snap.docs[0].data() || {};
-    const email = String(gp.final_approved_by_email || "").trim();
-    const role  = String(gp.final_approved_by_role || "").trim();
+function isBeforeOutFromData(data){
+  const outVal = data?.out_datetime || null;
+  const outD = toJSDate(outVal);
+  if (!outD) return false;
+  return new Date() < outD;
+}
 
-    if (email && role) return `${email} (${role})`;
-    return (email || role || "");
-  }catch(e){
-    return "";
+function buildQrLink(id){
+  const url = new URL(window.location.origin + window.location.pathname);
+  url.searchParams.set("id", id);
+  return url.toString();
+}
+
+async function loadGatepassPublic(id){
+  const snap = await getDoc(doc(db, "gatepass_public", id));
+  if (!snap.exists()){
+    showToast("Gatepass not found / not generated yet.");
+    return null;
   }
+  const data = snap.data() || {};
+  if (String(data.status||"").toLowerCase() !== "approved"){
+    showToast("Gatepass available only after approval.");
+    return null;
+  }
+  return { id, ...data };
 }
 
-    /* ===================== RENDERS ===================== */
+function renderPublicApprovedOnly(r){
+  mount.innerHTML = `
+    <h2>${r.student_name}</h2>
+    <p>${normalizeRoll(r.student_rollno)} • Room ${r.student_room_no}</p>
+    <p><b>Approved by:</b> ${approvedByLine(r)}</p>
+    <h1 style="color:${r.__expired?'#b42318':'#0f766e'}">
+      ${r.__expired ? "EXPIRED" : "APPROVED"}
+    </h1>
+  `;
+}
 
-    // ✅ Student view (full details)
-    function renderStudentGatepass(r){
-      const name = r.student_name || "—";
-      const roll = normalizeRoll(r.student_rollno || "");
-      const room = r.student_room_no || "—";
-
-      const outVal = r.out_datetime ?? r.outDT ?? r.out_datetime_ts ?? r.outDateTime ?? "";
-      const inVal  = r.in_datetime ?? r.inDT ?? r.in_datetime_ts ?? r.inDateTime ?? "";
-
-      const outDate = fmtDateOnly(outVal);
-      const outTime = fmtTimeOnly(outVal);
-      const inDate  = fmtDateOnly(inVal);
-      const inTime  = fmtTimeOnly(inVal);
-
-      const expired = !!r.__expired;
-      const qrToken = String(r.__qr_token || "").trim();
-      const reasonLine = buildReasonLine(r);
-
-      const el = document.createElement("div");
-
-      el.innerHTML = `
-        <div class="gpTop">
-          <div class="gpStudent">
-            <img class="gpPhoto" alt="Student photo">
-            <div class="gpAvatar">${initials(name)}</div>
-            <div style="min-width:0">
-              <div class="gpName">${name}</div>
-              <div class="gpMeta">
-                <div><b>${roll || "—"}</b> • Room ${room || "—"}</div>
-                ${qrToken ? `<div style="margin-top:6px;"><b>QR Token:</b> ${qrToken}</div>` : ``}
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="dtGrid">
-          <div class="dtCard outCard">
-            <div class="dtHead">
-              <div class="left">
-                <div class="dtIcon">⤴</div>
-                <div class="dtHeadTitle">OUT (Exit)</div>
-              </div>
-            </div>
-            <div class="dtBody">
-              <div class="dtBig">${outDate}</div>
-              <div class="dtTime">${outTime}</div>
-              <div class="dtHint">Student is allowed to leave campus after this time.</div>
-            </div>
-          </div>
-
-          <div class="dtCard inCard">
-            <div class="dtHead">
-              <div class="left">
-                <div class="dtIcon">⤵</div>
-                <div class="dtHeadTitle">IN (Return)</div>
-              </div>
-            </div>
-            <div class="dtBody">
-              <div class="dtBig">${inDate}</div>
-              <div class="dtTime">${inTime}</div>
-              <div class="dtHint">Student must return to campus before this time.</div>
-            </div>
-          </div>
-        </div>
-
-        <div class="infoGrid">
-          <div class="kv">
-            <div class="k">CONTACT NO</div>
-            <div class="v">${r.contact_no || "—"}</div>
-          </div>
-          <div class="kv">
-            <div class="k">STATUS</div>
-            <div class="v">${expired ? "APPROVED (EXPIRED)" : "APPROVED"}</div>
-          </div>
-          <div class="kv reason">
-            <div class="k">REASON</div>
-            <div class="v">${reasonLine}</div>
-          </div>
-        </div>
-
-        <div class="bottom">
-          <div class="stampWrap">
-            <div class="stampBig ${expired ? "expired" : ""}">${expired ? "EXPIRED" : "APPROVED"}</div>
-            <div class="stampNote">
-              Show this screen at the gate.<br>
-              QR scan opens this same gatepass.
-            </div>
-          </div>
-
-          <div>
-            <div class="qrWrap"><div id="qrHere"></div></div>
-            <div class="qrHint">Scan to open Gatepass</div>
-          </div>
-        </div>
-      `;
-
-      mount.innerHTML = "";
-      mount.appendChild(el);
-
-      const img = el.querySelector(".gpPhoto");
-      const av = el.querySelector(".gpAvatar");
-      const { primary, fallback } = resolvePhotoURL(r);
-
-      av.style.display = "grid";
-      img.style.display = "none";
-
-      if (primary){
-        let usedFallback = false;
-        img.referrerPolicy = "no-referrer";
-        img.onload = () => { img.style.display="block"; av.style.display="none"; };
-        img.onerror = () => {
-          if (!usedFallback && fallback){ usedFallback = true; img.src = fallback; return; }
-          img.style.display="none"; av.style.display="grid";
-        };
-        img.src = primary;
-      }
-
-      const link = buildQrLink(r.id);
-      const qrEl = document.getElementById("qrHere");
-      qrEl.innerHTML = "";
-      // eslint-disable-next-line no-undef
-      new QRCode(qrEl, { text: link, width: 150, height: 150 });
-    }
-
-    // ✅ Public/QR scan view (minimal details)
-    function renderPublicApprovedOnly(r){
-  const name = r.student_name || "—";
-  const roll = normalizeRoll(r.student_rollno || "");
-  const room = r.student_room_no || "—";
-  const by = approvedByLine(r);
-  const expired = !!r.__expired;
-
-  const el = document.createElement("div");
-  el.innerHTML = `
-    <div class="gpTop">
-      <div class="gpStudent">
-        <img class="gpPhoto" alt="Student photo">
-        <div class="gpAvatar">${initials(name)}</div>
-        <div style="min-width:0">
-          <div class="gpName">${name}</div>
-          <div class="gpMeta">
-            <div><b>${roll || "—"}</b> • Room ${room || "—"}</div>
-            <div style="margin-top:6px;"><b>Approved by:</b> ${by || "—"}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div class="bottom">
-      <div class="stampWrap">
-        <div class="stampBig ${expired ? "expired" : ""}">${expired ? "EXPIRED" : "APPROVED"}</div>
-        <div class="stampNote">
-          QR verification page (security view).<br>
-          No extra details shown.
-        </div>
-      </div>
-    </div>
+function renderStudentGatepass(r){
+  mount.innerHTML = `
+    <h2>${r.student_name}</h2>
+    <p>${normalizeRoll(r.student_rollno)} • Room ${r.student_room_no}</p>
+    <p><b>Approved by:</b> ${approvedByLine(r)}</p>
+    <p><b>OUT:</b> ${fmtDateOnly(r.out_datetime)} ${fmtTimeOnly(r.out_datetime)}</p>
+    <p><b>IN:</b> ${fmtDateOnly(r.in_datetime)} ${fmtTimeOnly(r.in_datetime)}</p>
+    <p><b>Reason:</b> ${r.reason_category || ""} ${r.reason_text || ""}</p>
+    <h1 style="color:${r.__expired?'#b42318':'#0f766e'}">
+      ${r.__expired ? "EXPIRED" : "APPROVED"}
+    </h1>
+    <div id="qrHere"></div>
   `;
 
-  mount.innerHTML = "";
-  mount.appendChild(el);
-
-  const img = el.querySelector(".gpPhoto");
-  const av = el.querySelector(".gpAvatar");
-  const { primary, fallback } = resolvePhotoURL(r);
-
-  av.style.display = "grid";
-  img.style.display = "none";
-
-  if (primary){
-    let usedFallback = false;
-    img.referrerPolicy = "no-referrer";
-    img.onload = () => { img.style.display="block"; av.style.display="none"; };
-    img.onerror = () => {
-      if (!usedFallback && fallback){ usedFallback = true; img.src = fallback; return; }
-      img.style.display="none"; av.style.display="grid";
-    };
-    img.src = primary;
-  }
+  const qrEl = document.getElementById("qrHere");
+  qrEl.innerHTML="";
+  new QRCode(qrEl,{
+    text: buildQrLink(r.id),
+    width:150,
+    height:150
+  });
 }
 
-      const link = buildQrLink(r.id);
-      const qrEl = document.getElementById("qrHere");
-      qrEl.innerHTML = "";
-      // eslint-disable-next-line no-undef
-      new QRCode(qrEl, { text: link, width: 150, height: 150 });
-    }
+onAuthStateChanged(auth, async (u) => {
+  const id = getIdFromURL();
+  if (!id){
+    showToast("Invalid link.");
+    return;
+  }
 
-    // ✅ Student waiting screen (before OUT time)
-    function renderWaiting(r){
-      const name = r.student_name || "—";
-      const roll = normalizeRoll(r.student_rollno || "");
-      const room = r.student_room_no || "—";
+  const gp = await loadGatepassPublic(id);
+  if (!gp) return;
 
-      const outVal = r.out_datetime ?? r.outDT ?? r.out_datetime_ts ?? r.outDateTime ?? "";
-      const outDate = fmtDateOnly(outVal);
-      const outTime = fmtTimeOnly(outVal);
+  gp.__expired = isExpiredFromData(gp);
+  gp.__before_out = isBeforeOutFromData(gp);
 
-      const el = document.createElement("div");
-      el.innerHTML = `
-        <div class="gpTop">
-          <div class="gpStudent">
-            <img class="gpPhoto" alt="Student photo">
-            <div class="gpAvatar">${initials(name)}</div>
-            <div style="min-width:0">
-              <div class="gpName">${name}</div>
-              <div class="gpMeta">
-                <div><b>${roll || "—"}</b> • Room ${room || "—"}</div>
-                <div style="margin-top:6px;">Gatepass will be available after:</div>
-                <div style="margin-top:4px;"><b>${outDate}</b> • <b>${outTime}</b></div>
-              </div>
-            </div>
-          </div>
-        </div>
+  if (!u){
+    renderPublicApprovedOnly(gp);
+    logoutBtn.style.display="none";
+    backBtn.style.display="none";
+    return;
+  }
 
-        <div class="bottom">
-          <div class="stampWrap">
-            <div class="stampBig waiting">WAIT</div>
-            <div class="stampNote">
-              You can view the gatepass only after your OUT time.<br>
-              Please wait till the allowed exit time.
-            </div>
-          </div>
+  const emailOk = normalizeEmail(gp.student_email) === normalizeEmail(u.email);
+  const uidOk = gp.student_uid && gp.student_uid === u.uid;
 
-          <div>
-            <div class="qrWrap" style="opacity:.45; filter:grayscale(1);">
-              <div style="font-weight:950; color: var(--muted); padding:24px 10px; text-align:center;">
-                QR available<br>after OUT time
-              </div>
-            </div>
-            <div class="qrHint">Not active yet</div>
-          </div>
-        </div>
-      `;
+  if (!emailOk && !uidOk){
+    showToast("Access denied.");
+    return;
+  }
 
-      mount.innerHTML = "";
-      mount.appendChild(el);
+  if (!gp.__expired && gp.__before_out){
+    showToast("Gatepass available after OUT time.");
+    return;
+  }
 
-      const img = el.querySelector(".gpPhoto");
-      const av = el.querySelector(".gpAvatar");
-      const { primary, fallback } = resolvePhotoURL(r);
+  renderStudentGatepass(gp);
+});
 
-      av.style.display = "grid";
-      img.style.display = "none";
+logoutBtn.addEventListener("click", async ()=>{
+  await signOut(auth);
+  window.location.replace("../index.html");
+});
 
-      if (primary){
-        let usedFallback = false;
-        img.referrerPolicy = "no-referrer";
-        img.onload = () => { img.style.display="block"; av.style.display="none"; };
-        img.onerror = () => {
-          if (!usedFallback && fallback){ usedFallback = true; img.src = fallback; return; }
-          img.style.display="none"; av.style.display="grid";
-        };
-        img.src = primary;
-      }
-    }
-
-    /* ===================== LOADERS ===================== */
-
-    backBtn.addEventListener("click", () => {
-      window.location.href = "student-dashboard.html";
-    });
-
-    logoutBtn.addEventListener("click", async () => {
-      try{ await signOut(auth); }catch(_){}
-      window.location.replace("../index.html");
-    });
-
-    async function loadGatepassPublic(id){
-      const snap = await getDoc(doc(db, "gatepass_public", id));
-      if (!snap.exists()){
-        showToast("Gatepass not found / not generated yet.");
-        return null;
-      }
-      const data = snap.data() || {};
-      const st = String(data.status || "").toLowerCase();
-      if (st !== "approved"){
-        showToast("Gatepass available only after approval.");
-        return null;
-      }
-      return { id, ...data };
-    }
-
-    onAuthStateChanged(auth, async (u) => {
-      const id = getIdFromURL();
-      if (!id){
-        showToast("Gatepass link is invalid (missing request id).");
-        return;
-      }
-
-      // Always try to read gatepass_public first
-      let gp = null;
-      try{
-        gp = await loadGatepassPublic(id);
-        if (!gp) return;
-      }catch(e){
-        console.error(e);
-        showToast("Unable to load gatepass (public). Check Firestore rules.");
-        return;
-      }
-
-      // compute states
-      gp.__expired = isExpiredFromData(gp);
-      gp.__before_out = isBeforeOutFromData(gp);
-
-      // Fetch qr_token from gatepasses (best effort)
-      gp.__qr_token = await tryFetchQrToken(id);
-      gp.__approved_by = await tryFetchApproverInfo(id);
-      
-      // ✅ PUBLIC VIEW (security QR scan)
-      if (!u){
-        logoutBtn.style.display = "none";
-        backBtn.style.display = "none";
-
-        // public can see approved or expired only (minimal card)
-        renderPublicApprovedOnly(gp);
-        return;
-      }
-
-      // ✅ PRIVATE VIEW (student)
-      try{
-        const emailOk = normalizeEmail(gp.student_email) === normalizeEmail(u.email);
-        const uidOk = gp.student_uid && String(gp.student_uid) === String(u.uid);
-
-        if (!emailOk && !uidOk){
-          showToast("Access denied.");
-          return;
-        }
-
-        // student cannot view before OUT time
-        if (!gp.__expired && gp.__before_out){
-          renderWaiting(gp);
-          return;
-        }
-
-        // normal student view (approved or expired)
-        renderStudentGatepass(gp);
-      }catch(e){
-        console.error(e);
-        showToast("Unable to load gatepass. Check Firestore permissions.");
-      }
-    });
-  </script>
+backBtn.addEventListener("click", ()=>{
+  window.location.href="student-dashboard.html";
+});
+</script>
 </body>
 </html>
+
 
