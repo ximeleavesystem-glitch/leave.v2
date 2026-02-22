@@ -1547,48 +1547,73 @@ textarea:focus{
     hcIntimation.textContent = String(cacheIntimationForBC.length);
   }
 
-  // ===== Gatepass Public =====
-  async function upsertPublicGatepass(requestId, requestRow){
-    const outVal = getOutDT(requestRow);
-    const inVal = getInDT(requestRow);
+ // ===== Gatepass Public =====
+async function upsertPublicGatepass(requestId, requestRow){
+  const outVal = getOutDT(requestRow);
+  const inVal = getInDT(requestRow);
 
-    const payload = {
-      status: "approved",
-      approved_public_at: isoNow(),
-      student_name: requestRow.student_name || "",
-      student_rollno: requestRow.student_rollno || "",
-      student_room_no: requestRow.student_room_no || "",
-      student_email: requestRow.student_email || "",
-      student_uid: requestRow.student_uid || "",
-      out_datetime: outVal || "",
-      in_datetime: inVal || "",
-      reason_category: requestRow.reason_category || "",
-      reason_text: requestRow.reason_text || requestRow.reason || "",
-      contact_no: requestRow.contact_no || "",
-      photo_url: requestRow.student_photo_url || requestRow.photo_url || "",
-      updatedAt: serverTimestamp(),
-      updated_at: serverTimestamp()
-    };
+  // try to detect role variable safely (won't crash if not defined)
+  const approverRole =
+    (typeof currentUserRole !== "undefined" && currentUserRole) ||
+    (typeof currentRole !== "undefined" && currentRole) ||
+    (typeof userRole !== "undefined" && userRole) ||
+    (typeof myRole !== "undefined" && myRole) ||
+    (typeof role !== "undefined" && role) ||
+    "";
 
+  // prefer a non-lowercased email if you already have it; fallback to lower
+  const approverEmail =
+    (typeof currentUserEmail !== "undefined" && currentUserEmail) ||
+    (typeof currentUserEmailLower !== "undefined" && currentUserEmailLower) ||
+    "";
+
+  const payload = {
+    status: "approved",
+    approved_public_at: isoNow(),
+
+    // ✅ ADD THESE (THIS FIXES "Approved by" in security view)
+    approved_by_email: String(approverEmail || "").toLowerCase(),
+    approved_by_role: String(approverRole || ""),
+
+    student_name: requestRow.student_name || "",
+    student_rollno: requestRow.student_rollno || "",
+    student_room_no: requestRow.student_room_no || "",
+    student_email: requestRow.student_email || "",
+    student_uid: requestRow.student_uid || "",
+
+    out_datetime: outVal || "",
+    in_datetime: inVal || "",
+
+    reason_category: requestRow.reason_category || "",
+    reason_text: requestRow.reason_text || requestRow.reason || "",
+    contact_no: requestRow.contact_no || "",
+
+    // your student photo is already coming here (good)
+    photo_url: requestRow.student_photo_url || requestRow.photo_url || "",
+
+    updatedAt: serverTimestamp(),
+    updated_at: serverTimestamp()
+  };
+
+  await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
+}
+
+async function revokePublicGatepass(requestId, reason="rejected"){
+  const payload = {
+    status: "revoked",
+    revoked_at: serverTimestamp(),
+    revokedAt: serverTimestamp(),
+    revoked_by: currentUserEmailLower,
+    revoke_reason: String(reason || "rejected"),
+    updatedAt: serverTimestamp(),
+    updated_at: serverTimestamp()
+  };
+  try{
     await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
+  }catch(e){
+    console.warn("Unable to revoke gatepass_public:", e);
   }
-
-  async function revokePublicGatepass(requestId, reason="rejected"){
-    const payload = {
-      status: "revoked",
-      revoked_at: serverTimestamp(),
-      revokedAt: serverTimestamp(),
-      revoked_by: currentUserEmailLower,
-      revoke_reason: String(reason || "rejected"),
-      updatedAt: serverTimestamp(),
-      updated_at: serverTimestamp()
-    };
-    try{
-      await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
-    }catch(e){
-      console.warn("Unable to revoke gatepass_public:", e);
-    }
-  }
+}
 
   // ===== Approve / Reject helpers =====
   function ensureDeanStage(chain, deanEmail){
@@ -1974,6 +1999,7 @@ textarea:focus{
 </script>
 </body>
 </html>
+
 
 
 
