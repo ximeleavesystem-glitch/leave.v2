@@ -527,7 +527,7 @@ textarea:focus{
     <div class="reportsGrid">
       <section class="panel">
         <div class="panelHead">
-          <h3 class="panelTitle">Reports (Download PDF)</h3>
+<h3 class="panelTitle">Reports (Download Excel)</h3>
           <div class="smallBtns">
             <button class="btnGhost" id="repClear" type="button">Clear</button>
           </div>
@@ -569,7 +569,7 @@ textarea:focus{
               </select>
             </div>
 
-            <button class="applyBtn" id="repDownload" type="button">Download PDF</button>
+            <button class="applyBtn" id="repDownload" type="button">Download Excel</button>
           </div>
 
           <div class="pills" style="margin-top:10px;">
@@ -688,7 +688,6 @@ textarea:focus{
       <div class="statusTab active" id="hApproved">Approved <span class="count" id="hcApproved">0</span></div>
       <div class="statusTab" id="hRejected">Rejected <span class="count" id="hcRejected">0</span></div>
       <div class="statusTab" id="hEscalated">Escalated to Dean <span class="count" id="hcEscalated">0</span></div>
-      <div class="statusTab hidden" id="hIntimation">Intimation (Warden Approved) <span class="count" id="hcIntimation">0</span></div>
     </div>
 
     <div id="historyContainer"></div>
@@ -696,9 +695,8 @@ textarea:focus{
 
 </div>
 
-<!-- PDF libs -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
+<!-- Excel (XLSX) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
@@ -765,15 +763,13 @@ textarea:focus{
   const requestsContainer = document.getElementById("requestsContainer");
   const historyContainer = document.getElementById("historyContainer");
 
-  // History tabs
-  const hApproved = document.getElementById("hApproved");
-  const hRejected = document.getElementById("hRejected");
-  const hEscalated = document.getElementById("hEscalated");
-  const hIntimation = document.getElementById("hIntimation");
-  const hcApproved = document.getElementById("hcApproved");
-  const hcRejected = document.getElementById("hcRejected");
-  const hcEscalated = document.getElementById("hcEscalated");
-  const hcIntimation = document.getElementById("hcIntimation");
+ // History tabs
+const hApproved = document.getElementById("hApproved");
+const hRejected = document.getElementById("hRejected");
+const hEscalated = document.getElementById("hEscalated");
+const hcApproved = document.getElementById("hcApproved");
+const hcRejected = document.getElementById("hcRejected");
+const hcEscalated = document.getElementById("hcEscalated");
 
   // History filters
   const hFrom = document.getElementById("hFrom");
@@ -823,7 +819,7 @@ textarea:focus{
   let activeHistoryTab = "approved"; // approved | rejected | escalated | intimation
 
   let cacheAllForApprover = []; // pending + acted by me + escalated
-  let cacheIntimationForBC = []; // warden-approved final requests for my bc year(s)
+
   const rosterPhotoCache = new Map();
   const IMG_PLACEHOLDER = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
@@ -1064,12 +1060,6 @@ textarea:focus{
     } else {
       lineBC.style.display = "none";
     }
-
-    if (canBC){
-      hIntimation.classList.remove("hidden");
-    } else {
-      hIntimation.classList.add("hidden");
-    }
   }
 
   async function loadRoleDoc(){
@@ -1238,33 +1228,6 @@ textarea:focus{
     const map = new Map();
     [...pendingRows, ...actedOrEscalated].forEach(r => map.set(r.id, r));
     cacheAllForApprover = [...map.values()];
-
-    cacheIntimationForBC = [];
-    if (canBC && bcYears.length){
-      const years = bcYears.filter(y => y === "1" || y === "2");
-      try{
-        const qFinal = query(
-          collection(db, "leave_requests"),
-          where("status", "in", ["approved_final","approved_dean_final"])
-        );
-        const snap = await getDocs(qFinal);
-        let rows = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-
-        rows = rows.filter(r => String(r?.routing?.l1_role || "").toLowerCase() === "warden");
-        rows = rows.filter(r => years.includes(String(getStudentYear(r))));
-        rows = rows.filter(r => inDateRangeOutDT(r, dashFrom, dashTo));
-
-        rows.sort((a,b) => {
-          const ad = toJSDate(getOutDT(a));
-          const bd = toJSDate(getOutDT(b));
-          return (bd?.getTime?.()||0) - (ad?.getTime?.()||0);
-        });
-
-        cacheIntimationForBC = rows;
-      }catch(e){
-        cacheIntimationForBC = [];
-      }
-    }
   }
 
   function computeDashboardMetrics(){
@@ -1429,25 +1392,20 @@ textarea:focus{
     if (which === "approved") hApproved.classList.add("active");
     if (which === "rejected") hRejected.classList.add("active");
     if (which === "escalated") hEscalated.classList.add("active");
-    if (which === "intimation") hIntimation.classList.add("active");
     renderHistory();
   }
 
   function renderHistory(){
     let rows = [];
 
-    if (activeHistoryTab === "intimation"){
-      rows = cacheIntimationForBC.slice();
-    } else {
-      rows = cacheAllForApprover.slice();
-      if (activeHistoryTab === "approved"){
-        rows = rows.filter(r => didIAct(r.approver_chain) === "approved");
-      } else if (activeHistoryTab === "rejected"){
-        rows = rows.filter(r => didIAct(r.approver_chain) === "rejected");
-      } else {
-        rows = rows.filter(r => !!(r?.escalation?.requested));
-      }
-    }
+   rows = cacheAllForApprover.slice();
+if (activeHistoryTab === "approved"){
+  rows = rows.filter(r => didIAct(r.approver_chain) === "approved");
+} else if (activeHistoryTab === "rejected"){
+  rows = rows.filter(r => didIAct(r.approver_chain) === "rejected");
+} else {
+  rows = rows.filter(r => !!(r?.escalation?.requested));
+}
 
     rows = applyHistoryFilters(rows);
 
@@ -1544,7 +1502,6 @@ textarea:focus{
     hcApproved.textContent = String(cacheAllForApprover.filter(r => didIAct(r.approver_chain) === "approved").length);
     hcRejected.textContent = String(cacheAllForApprover.filter(r => didIAct(r.approver_chain) === "rejected").length);
     hcEscalated.textContent = String(cacheAllForApprover.filter(r => !!(r?.escalation?.requested)).length);
-    hcIntimation.textContent = String(cacheIntimationForBC.length);
   }
 
  // ===== Gatepass Public =====
@@ -1866,7 +1823,6 @@ async function revokePublicGatepass(requestId, reason="rejected"){
   hApproved.addEventListener("click", () => setHistoryTab("approved"));
   hRejected.addEventListener("click", () => setHistoryTab("rejected"));
   hEscalated.addEventListener("click", () => setHistoryTab("escalated"));
-  hIntimation.addEventListener("click", () => setHistoryTab("intimation"));
 
   hApplyFilters.addEventListener("click", () => renderHistory());
   hClearFilters.addEventListener("click", () => {
@@ -1939,7 +1895,96 @@ async function revokePublicGatepass(requestId, reason="rejected"){
     repToast.className = "toast";
     repToast.textContent = "";
   });
+// ===== Reports: Excel Download =====
+function inDateRangeInDT(row, fromDate, toDate){
+  const inVal = getInDT(row);
+  if (!inVal) return false;
+  const inDate = toJSDate(inVal);
+  if (!inDate) return false;
 
+  const s = parseDateStart(fromDate);
+  const e = parseDateEnd(toDate);
+  if (s && inDate < s) return false;
+  if (e && inDate > e) return false;
+  return true;
+}
+
+function buildReportRows(){
+  const from = (repFrom.value || "").trim();
+  const to   = (repTo.value || "").trim();
+  const year = String(repYear.value || "all");
+  const roll = normalizeRollno(repRoll.value || "");
+
+  // only FINAL approved, and only those APPROVED BY ME (at my stage)
+  let rows = cacheAllForApprover.slice()
+    .filter(r => isFinalApprovedStatus(r.status))
+    .filter(r => didIAct(r.approver_chain) === "approved")
+    .filter(r => inDateRangeInDT(r, from, to));
+
+  if (year !== "all"){
+    rows = rows.filter(r => String(getStudentYear(r)) === year);
+  }
+
+  if (repMode === "student"){
+    if (!roll) throw new Error("Enter Student Roll No for Student-wise report.");
+    rows = rows.filter(r => normalizeRollno(r.student_rollno || "") === roll);
+  }
+
+  // newest first (IN time)
+  rows.sort((a,b) => (toJSDate(getInDT(b))?.getTime()||0) - (toJSDate(getInDT(a))?.getTime()||0));
+
+  // transform to flat rows for Excel
+  return rows.map((r, i) => ({
+    "S.No": i + 1,
+    "Name": r.student_name || "",
+    "Roll No": normalizeRollno(r.student_rollno || ""),
+    "Room No": r.student_room_no || "",
+    "Year": String(getStudentYear(r) || ""),
+    "Hostel": String(getHostel(r) || ""),
+    "Reason Category": String(r.reason_category || ""),
+    "Reason": String(r.reason_text || r.reason || ""),
+    "OUT DateTime": fmtDT(getOutDT(r)),
+    "IN DateTime": fmtDT(getInDT(r)),
+    "Status": String(r.status || ""),
+    "Arrival Status": computeArrivalStatusLine(r).replace(/^✅\s*|^⚠️\s*/g, "") // cleaner text
+  }));
+}
+
+function downloadExcel(rows){
+  if (!window.XLSX) throw new Error("Excel library not loaded.");
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Report");
+
+  const stamp = new Date();
+  const yyyy = stamp.getFullYear();
+  const mm = String(stamp.getMonth()+1).padStart(2,"0");
+  const dd = String(stamp.getDate()).padStart(2,"0");
+  const fileName = `XIME_Report_${yyyy}${mm}${dd}.xlsx`;
+
+  XLSX.writeFile(wb, fileName);
+}
+
+function setRepToast(msg, kind="good"){
+  repToast.className = `toast show ${kind}`;
+  repToast.textContent = msg;
+}
+
+repDownload.addEventListener("click", () => {
+  try{
+    const rows = buildReportRows();
+    if (!rows.length){
+      setRepToast("No records found for this filter.", "bad");
+      return;
+    }
+    downloadExcel(rows);
+    setRepToast(`Downloaded Excel (${rows.length} rows).`, "good");
+  }catch(e){
+    console.error(e);
+    setRepToast(e?.message || "Unable to download report.", "bad");
+  }
+});
   // ===== Auth boot =====
   onAuthStateChanged(auth, async (u) => {
     if (!u){
@@ -1999,6 +2044,7 @@ async function revokePublicGatepass(requestId, reason="rejected"){
 </script>
 </body>
 </html>
+
 
 
 
