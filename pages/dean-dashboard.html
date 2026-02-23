@@ -438,14 +438,12 @@
             </div>
             <div class="reportsBody">
               <p class="reportsHint">
-                Reports are filtered by <b>IN datetime</b>. Latecomers report includes only:
-                <b>arrival.verified = true</b> and <b>late_minutes &gt; 0</b>.
+                Reports are filtered by <b>IN datetime</b>.
               </p>
 
               <div class="modeTabs">
                 <div class="modeTab active" id="modeTimeframe">Timeframe (Approved Final + Dean Approved)</div>
                 <div class="modeTab" id="modeStudent">Student-wise (Roll No + Timeframe)</div>
-                <div class="modeTab" id="modeLate">Latecomers (Verified + Late)</div>
               </div>
 
               <div class="reportGrid">
@@ -474,7 +472,7 @@
                 </div>
               </div>
 
-<button class="bigDownload" id="repDownloadBtn" type="button" style="margin-top:12px;">Download Excel</button>
+              <button class="bigDownload" id="repDownloadBtn" type="button" style="margin-top:12px;">Download Excel</button>
               <div class="toast" id="repToast"></div>
             </div>
           </div>
@@ -557,9 +555,9 @@
     </section>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+  <!-- Excel lib -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
+
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
     import { getAuth, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-auth.js";
@@ -569,9 +567,6 @@
     } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore.js";
 
     window.addEventListener("pageshow", (e) => { if (e.persisted) window.location.reload(); });
-
-    const { jsPDF } = window.jspdf || {};
-    if (!jsPDF){ console.error("jsPDF not loaded. Check CDN access."); }
 
     const firebaseConfig = {
       apiKey: "AIzaSyDgoq2rMU5kiKcz_27-hjBzd8rxS8yQqdY",
@@ -645,7 +640,6 @@
 
     const modeTimeframe = document.getElementById("modeTimeframe");
     const modeStudent = document.getElementById("modeStudent");
-    const modeLate = document.getElementById("modeLate");
     const repFrom = document.getElementById("repFrom");
     const repTo = document.getElementById("repTo");
     const repYear = document.getElementById("repYear");
@@ -737,10 +731,6 @@
       return v === true || String(v).toLowerCase() === "true";
     }
 
-    function getActualIn(r){
-      return toISO((r.arrival && r.arrival.actual_in_time) ? r.arrival.actual_in_time : (r.arrival && r.arrival.actualInTime) ? r.arrival.actualInTime : "");
-    }
-
     function getLateMinutes(r){
       const lm = r?.arrival?.late_minutes ?? r?.arrival?.lateMinutes ?? r?.late_minutes ?? r?.lateMinutes;
       if (lm === null || lm === undefined || lm === "") return null;
@@ -764,23 +754,6 @@
       hh = hh % 12; hh = hh ? hh : 12;
       const hh2 = String(hh).padStart(2,"0");
       return `${dd}/${mm}/${yyyy} ${hh2}:${min} ${ampm}`;
-    }
-
-    function initials(name){
-      const n = String(name || "").trim();
-      if (!n) return "ST";
-      const parts = n.split(/\s+/).filter(Boolean);
-      const a = parts[0]?.[0] || "S";
-      const b = parts.length > 1 ? (parts[parts.length-1]?.[0] || "") : (parts[0]?.[1] || "");
-      return (a + b).toUpperCase();
-    }
-
-    function statusPillFromStatus(status){
-      const s = String(status||"").toLowerCase();
-      if (s === "approved_dean_final") return `<span class="pill approved">APPROVED</span>`;
-      if (s === "rejected_dean") return `<span class="pill rejected">REJECTED</span>`;
-      if (s === "pending_dean") return `<span class="pill pending">PENDING</span>`;
-      return `<span class="pill pending">${String(status||"PENDING").toUpperCase()}</span>`;
     }
 
     function matchesText(r, needle){
@@ -830,88 +803,6 @@
         updated_at: serverTimestamp()
       };
       await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
-    }
-
-    function extractDriveId(url){
-      const u = String(url || "").trim();
-      if (!u) return "";
-      const m1 = u.match(/drive\.google\.com\/file\/d\/([^\/]+)\//i);
-      if (m1 && m1[1]) return m1[1];
-      const m2 = u.match(/[?&]id=([^&]+)/i);
-      if (m2 && m2[1]) return m2[1];
-      const m3 = u.match(/uc\?export=view&id=([^&]+)/i);
-      if (m3 && m3[1]) return m3[1];
-      return "";
-    }
-
-    function resolveDriveUrls(rawLink){
-      const id = extractDriveId(rawLink);
-      if (!id) return { primary: rawLink, fallback: "" };
-      return {
-        primary: `https://lh3.googleusercontent.com/d/${id}=w1000`,
-        fallback: `https://drive.google.com/uc?export=view&id=${id}`
-      };
-    }
-
-    function resolvePhotoURL(raw){
-      const link = String(raw || "").trim();
-      if (!link) return { primary:"", fallback:"" };
-      if (link.includes("drive.google.com") || link.includes("googleusercontent.com")) return resolveDriveUrls(link);
-      if (link.startsWith("http://") || link.startsWith("https://")) return { primary: link, fallback:"" };
-      return { primary:"", fallback:"" };
-    }
-
-    function buildAvatarNode(studentName, photoRaw){
-      const init = initials(studentName);
-      const wrap = document.createElement("div");
-      wrap.className = "studentAvatar";
-      wrap.textContent = init;
-
-      const { primary, fallback } = resolvePhotoURL(photoRaw);
-      if (!primary) return wrap;
-
-      const img = new Image();
-      img.alt = "Student photo";
-      img.referrerPolicy = "no-referrer";
-      let triedFallback = false;
-
-      img.onload = () => {
-        wrap.textContent = "";
-        wrap.appendChild(img);
-      };
-
-      img.onerror = () => {
-        if (!triedFallback && fallback){
-          triedFallback = true;
-          img.src = fallback;
-          return;
-        }
-        wrap.textContent = init;
-      };
-
-      img.src = primary;
-      return wrap;
-    }
-
-    function getApprovedBy(r){
-      const direct =
-        r.approved_by || r.approvedBy ||
-        r.final_approved_by || r.finalApprovedBy ||
-        r.current_approved_by || r.currentApprovedBy;
-
-      if (direct) return String(direct);
-
-      const chain = Array.isArray(r.approver_chain) ? r.approver_chain : [];
-      for (let i = chain.length - 1; i >= 0; i--){
-        const x = chain[i] || {};
-        const act = String(x.action || x.status || "").toLowerCase();
-        if (act === "approved" || act === "approve"){
-          if (x.email) return String(x.email);
-          if (x.approver_email) return String(x.approver_email);
-          if (x.user_email) return String(x.user_email);
-        }
-      }
-      return "";
     }
 
     /* ✅ NEW: ensure Dean stage exists in chain */
@@ -1014,6 +905,105 @@
       return { studentName, roll, email, room, reason, outVal, inVal, photo };
     }
 
+    function initials(name){
+      const n = String(name || "").trim();
+      if (!n) return "ST";
+      const parts = n.split(/\s+/).filter(Boolean);
+      const a = parts[0]?.[0] || "S";
+      const b = parts.length > 1 ? (parts[parts.length-1]?.[0] || "") : (parts[0]?.[1] || "");
+      return (a + b).toUpperCase();
+    }
+
+    function extractDriveId(url){
+      const u = String(url || "").trim();
+      if (!u) return "";
+      const m1 = u.match(/drive\.google\.com\/file\/d\/([^\/]+)\//i);
+      if (m1 && m1[1]) return m1[1];
+      const m2 = u.match(/[?&]id=([^&]+)/i);
+      if (m2 && m2[1]) return m2[1];
+      const m3 = u.match(/uc\?export=view&id=([^&]+)/i);
+      if (m3 && m3[1]) return m3[1];
+      return "";
+    }
+
+    function resolveDriveUrls(rawLink){
+      const id = extractDriveId(rawLink);
+      if (!id) return { primary: rawLink, fallback: "" };
+      return {
+        primary: `https://lh3.googleusercontent.com/d/${id}=w1000`,
+        fallback: `https://drive.google.com/uc?export=view&id=${id}`
+      };
+    }
+
+    function resolvePhotoURL(raw){
+      const link = String(raw || "").trim();
+      if (!link) return { primary:"", fallback:"" };
+      if (link.includes("drive.google.com") || link.includes("googleusercontent.com")) return resolveDriveUrls(link);
+      if (link.startsWith("http://") || link.startsWith("https://")) return { primary: link, fallback:"" };
+      return { primary:"", fallback:"" };
+    }
+
+    function buildAvatarNode(studentName, photoRaw){
+      const init = initials(studentName);
+      const wrap = document.createElement("div");
+      wrap.className = "studentAvatar";
+      wrap.textContent = init;
+
+      const { primary, fallback } = resolvePhotoURL(photoRaw);
+      if (!primary) return wrap;
+
+      const img = new Image();
+      img.alt = "Student photo";
+      img.referrerPolicy = "no-referrer";
+      let triedFallback = false;
+
+      img.onload = () => {
+        wrap.textContent = "";
+        wrap.appendChild(img);
+      };
+
+      img.onerror = () => {
+        if (!triedFallback && fallback){
+          triedFallback = true;
+          img.src = fallback;
+          return;
+        }
+        wrap.textContent = init;
+      };
+
+      img.src = primary;
+      return wrap;
+    }
+
+    function statusPillFromStatus(status){
+      const s = String(status||"").toLowerCase();
+      if (s === "approved_dean_final") return `<span class="pill approved">APPROVED</span>`;
+      if (s === "rejected_dean") return `<span class="pill rejected">REJECTED</span>`;
+      if (s === "pending_dean") return `<span class="pill pending">PENDING</span>`;
+      return `<span class="pill pending">${String(status||"PENDING").toUpperCase()}</span>`;
+    }
+
+    function getApprovedBy(r){
+      const direct =
+        r.approved_by || r.approvedBy ||
+        r.final_approved_by || r.finalApprovedBy ||
+        r.current_approved_by || r.currentApprovedBy;
+
+      if (direct) return String(direct);
+
+      const chain = Array.isArray(r.approver_chain) ? r.approver_chain : [];
+      for (let i = chain.length - 1; i >= 0; i--){
+        const x = chain[i] || {};
+        const act = String(x.action || x.status || "").toLowerCase();
+        if (act === "approved" || act === "approve"){
+          if (x.email) return String(x.email);
+          if (x.approver_email) return String(x.approver_email);
+          if (x.user_email) return String(x.user_email);
+        }
+      }
+      return "";
+    }
+
     function renderEscalationCard(r){
       const card = document.createElement("section");
       card.className = "requestCard";
@@ -1105,7 +1095,6 @@
       const tag = lt ? lt.toUpperCase() : "APPROVED FINAL";
 
       const verified = getArrivalVerified(r);
-      const actual = getActualIn(r);
       const lateMin = getLateMinutes(r);
       const approvedBy = getApprovedBy(r);
 
@@ -1124,7 +1113,6 @@
               <div class="studentMeta" style="margin-top:6px;">
                 ${approvedBy ? `<b>Approved by:</b> ${approvedBy} &nbsp; • &nbsp; ` : ""}
                 ${lateTxt}
-                ${verified && actual ? ` &nbsp; • &nbsp; <b>Actual In:</b> ${fmtDT(actual)}` : ``}
               </div>
             </div>
           </div>
@@ -1150,7 +1138,6 @@
       const { studentName, roll, email, room, reason, outVal, inVal, photo } = baseStudentInfo(r);
 
       const verified = getArrivalVerified(r);
-      const actual = getActualIn(r);
       const lateMin = getLateMinutes(r);
 
       const lateTxt = (verified && lateMin !== null)
@@ -1173,7 +1160,6 @@
               <div class="tagType"><span class="miniDot"></span>Dean Acted</div>
               <div class="studentMeta" style="margin-top:6px;">
                 ${lateTxt}
-                ${verified && actual ? ` &nbsp; • &nbsp; <b>Actual In:</b> ${fmtDT(actual)}` : ``}
               </div>
               <div class="studentMeta" style="margin-top:6px;">
                 ${editPill}
@@ -1411,8 +1397,6 @@
 
       try{
         await updateDoc(ref, updates);
-
-        // ✅ do NOT block approval if gatepass_public fails
         try { await upsertPublicGatepass(id, { ...r, ...updates }); }
         catch(e){ console.warn("gatepass_public upsert failed:", e); }
 
@@ -1451,7 +1435,6 @@
         escalation: { ...(r.escalation || {}), requested: true, dean_action: "rejected", dean_acted_at: nowISO },
         current_holder_email: null,
         current: { ...(r.current || {}), holder_email: null, holder_role: null, stage: null },
-        // ✅ keep clean
         final_approved_by: null,
         final_approved_at: null,
         final_rejected_by: normalizeEmail(DEAN_EMAIL),
@@ -1464,7 +1447,6 @@
 
       try{
         await updateDoc(ref, updates);
-
         try { await revokePublicGatepass(id, remark || "Dean rejected"); }
         catch(e){ console.warn("gatepass_public revoke failed:", e); }
 
@@ -1525,7 +1507,6 @@
         updates.final_rejected_by = null;
         updates.final_rejected_at = null;
       } else {
-        // ✅ IMPORTANT: clear approved fields also
         updates.final_approved_by = null;
         updates.final_approved_at = null;
         updates.final_rejected_by = normalizeEmail(DEAN_EMAIL);
@@ -1552,257 +1533,265 @@
       }
     }
 
-    /* ---------------- Reports (unchanged) ---------------- */
-   function excelNowPretty(){
-  return new Date().toLocaleString("en-GB", { hour12: true });
-}
-
-function safeText(v){
-  return String(v ?? "").replace(/\s+/g, " ").trim();
-}
-
-function computeArrivalStatusLineDean(r){
-  // Simple & clean for report
-  const verified = getArrivalVerified(r);
-  if (!verified) return "Not Verified";
-
-  const lateMin = getLateMinutes(r);
-  if (lateMin === null || lateMin === undefined) return "Verified";
-
-  if (lateMin > 0) return `Late (${lateMin} min)`;
-  return "On Time";
-}
-
-function buildDeanStyledWorkbook({ rows, meta }){
-  if (!window.XLSX) throw new Error("Excel library not loaded.");
-  const XLSX = window.XLSX;
-
-  const RED = "C1121F";
-  const BORDER = { style: "thin", color: { rgb: "E5E7EB" } };
-
-  const sTitle1 = {
-    font: { bold:true, sz: 18, color:{ rgb:"111827" } },
-    alignment: { horizontal:"left", vertical:"center" }
-  };
-  const sTitle2 = {
-    font: { bold:true, sz: 16, color:{ rgb: RED } },
-    alignment: { horizontal:"left", vertical:"center" }
-  };
-  const sMeta = {
-    font: { sz: 12, color:{ rgb:"111827" } },
-    alignment: { horizontal:"left", vertical:"center", wrapText:true }
-  };
-  const sTotal = {
-    font: { bold:true, sz: 13, color:{ rgb:"111827" } },
-    alignment: { horizontal:"left", vertical:"center" }
-  };
-  const sHeader = {
-    font: { bold:true, sz: 12, color:{ rgb:"FFFFFF" } },
-    fill: { fgColor: { rgb: RED } },
-    alignment: { horizontal:"center", vertical:"center", wrapText:true },
-    border: { top:BORDER, bottom:BORDER, left:BORDER, right:BORDER }
-  };
-  const sCell = {
-    font: { sz: 11, color:{ rgb:"111827" } },
-    alignment: { horizontal:"left", vertical:"top", wrapText:true },
-    border: { top:BORDER, bottom:BORDER, left:BORDER, right:BORDER }
-  };
-  const sCellCenter = {
-    ...sCell,
-    alignment: { horizontal:"center", vertical:"top", wrapText:true }
-  };
-
-  // Build AOA: Title + Meta + Total + Table
-  const aoa = [];
-  aoa.push(["Xavier Institute of Management and Entrepreneurship (XIME)"]);
-  aoa.push(["Leave Management System — Final Approved Requests Report"]);
-  aoa.push([""]);
-
-  aoa.push([`Prepared by: Dean (${DEAN_EMAIL})`]);
-  aoa.push([`Generated: ${meta.generatedAt}`]);
-  aoa.push([`IN datetime range: ${meta.inRange}`]);
-  aoa.push([`Year Filter: ${meta.yearFilter}`]);
-  aoa.push([`Mode: ${meta.mode}`]);
-  if (meta.roll) aoa.push([`Roll No: ${meta.roll}`]);
-
-  aoa.push([""]);
-  aoa.push([`Total Records: ${rows.length}`]);
-  aoa.push([""]);
-
-  const header = [
-    "S.No",
-    "Roll No",
-    "Student Name",
-    "Year",
-    "Hostel",
-    "Room",
-    "Out Date & Time",
-    "In Date & Time",
-    "Arrival Status",
-    "Contact",
-    "Reason"
-  ];
-  aoa.push(header);
-
-  rows.forEach((r, idx) => {
-    const roll = normalizeRollno(r.student_rollno || r.student?.rollno || "");
-    const nm = safeText(r.student_name || r.student?.name || "");
-    const year = safeText(r.student_year || "");
-    const hostel = safeText(r.student_hostel || "");
-    const room = safeText(r.student_room_no || r.student?.room || r.student?.roomNo || "");
-    const outDT = fmtDT(getOutDT(r));
-    const inDT  = fmtDT(getInDT(r));
-    const arrival = computeArrivalStatusLineDean(r);
-    const phone = safeText(r.contact_no || r.phone || r.contact || "");
-    const reason = safeText(r.reason_text || r.reason || r.reasonText || "");
-
-    aoa.push([
-      idx + 1,
-      roll,
-      nm,
-      year,
-      hostel,
-      room,
-      outDT,
-      inDT,
-      arrival,
-      phone,
-      reason
-    ]);
-  });
-
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-
-  // Row indexes
-  const rowTitle1 = 0;
-  const rowTitle2 = 1;
-  const rowMetaStart = 3;
-  const rowTotal = meta.roll ? 10 : 9;     // if roll line exists, meta is 1 row longer
-  const rowHeader = meta.roll ? 12 : 11;
-
-  // Merge title/meta across A..K
-  const merges = [
-    { s:{r:rowTitle1,c:0}, e:{r:rowTitle1,c:10} },
-    { s:{r:rowTitle2,c:0}, e:{r:rowTitle2,c:10} },
-  ];
-  // meta lines: merge each line across
-  const metaLinesCount = meta.roll ? 6 : 5;
-  for (let i=0; i<metaLinesCount; i++){
-    merges.push({ s:{r:rowMetaStart+i,c:0}, e:{r:rowMetaStart+i,c:10} });
-  }
-  merges.push({ s:{r:rowTotal,c:0}, e:{r:rowTotal,c:10} });
-  ws["!merges"] = merges;
-
-  // Column widths (PDF-like)
-  ws["!cols"] = [
-    { wch: 6 },   // S.No
-    { wch: 10 },  // Roll
-    { wch: 18 },  // Name
-    { wch: 6 },   // Year
-    { wch: 10 },  // Hostel
-    { wch: 8 },   // Room
-    { wch: 18 },  // Out
-    { wch: 18 },  // In
-    { wch: 18 },  // Arrival
-    { wch: 12 },  // Contact
-    { wch: 30 }   // Reason
-  ];
-
-  // Apply styles
-  ws["A1"].s = sTitle1;
-  ws["A2"].s = sTitle2;
-
-  for (let r=rowMetaStart; r<rowMetaStart+metaLinesCount; r++){
-    const addr = XLSX.utils.encode_cell({ r, c:0 });
-    if (ws[addr]) ws[addr].s = sMeta;
-  }
-
-  const addrTotal = XLSX.utils.encode_cell({ r:rowTotal, c:0 });
-  if (ws[addrTotal]) ws[addrTotal].s = sTotal;
-
-  // Header styling
-  for (let c=0; c<=10; c++){
-    const addr = XLSX.utils.encode_cell({ r:rowHeader, c });
-    if (ws[addr]) ws[addr].s = sHeader;
-  }
-
-  // Body styling
-  const range = XLSX.utils.decode_range(ws["!ref"]);
-  for (let r=rowHeader+1; r<=range.e.r; r++){
-    for (let c=0; c<=10; c++){
-      const addr = XLSX.utils.encode_cell({ r, c });
-      if (!ws[addr]) continue;
-      const centerCols = new Set([0,1,3,4,5,9]);
-      ws[addr].s = centerCols.has(c) ? sCellCenter : sCell;
+    /* ---------------- Reports (Excel) ---------------- */
+    function excelNowPretty(){
+      return new Date().toLocaleString("en-GB", { hour12: true });
     }
-  }
+    function safeText(v){
+      return String(v ?? "").replace(/\s+/g, " ").trim();
+    }
+    function computeArrivalStatusLineDean(r){
+      const verified = getArrivalVerified(r);
+      if (!verified) return "Not Verified";
+      const lateMin = getLateMinutes(r);
+      if (lateMin === null || lateMin === undefined) return "Verified";
+      if (lateMin > 0) return `Late (${lateMin} min)`;
+      return "On Time";
+    }
 
-  // Freeze header row
-  ws["!freeze"] = { xSplit: 0, ySplit: rowHeader + 1 };
+    function setMode(m){
+      reportMode = m;
+      modeTimeframe.classList.toggle("active", m==="timeframe");
+      modeStudent.classList.toggle("active", m==="student");
+      rollRow.classList.toggle("show", m==="student");
+      if (m !== "student") repRoll.value = "";
+    }
 
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Final Approved");
-  return wb;
-}
+    modeTimeframe.addEventListener("click", () => setMode("timeframe"));
+    modeStudent.addEventListener("click", () => setMode("student"));
 
-function downloadDeanExcel(wb, meta){
-  const XLSX = window.XLSX;
-  const stamp = new Date();
-  const yyyy = stamp.getFullYear();
-  const mm = String(stamp.getMonth()+1).padStart(2,"0");
-  const dd = String(stamp.getDate()).padStart(2,"0");
+    repClearBtn.addEventListener("click", () => {
+      repFrom.value = "";
+      repTo.value = "";
+      repYear.value = "";
+      repRoll.value = "";
+      setMode("timeframe");
+      showToast("", "");
+    });
 
-  const tag =
-    meta.modeTag ||
-    (reportMode === "late" ? "Latecomers" : (reportMode === "student" ? `Approved_${meta.roll}` : "Approved"));
+    // ✅ FIX: define fetchRowsForReport (no latecomers)
+    async function fetchRowsForReport(){
+      const from = repFrom.value || "";
+      const to = repTo.value || "";
+      const year = repYear.value || "";
+      const rollNeedle = normalizeRollno(repRoll.value || "");
 
-  const fileName = `XIME_${tag}_${yyyy}${mm}${dd}.xlsx`;
-  XLSX.writeFile(wb, fileName);
-}
+      if (reportMode === "student" && !rollNeedle){
+        throw new Error("Enter Roll No for Student-wise report.");
+      }
+
+      const [sFinal, sDeanApproved] = await Promise.all([
+        getDocs(query(collection(db, "leave_requests"), where("status","==","approved_final"), limit(5000))),
+        getDocs(query(collection(db, "leave_requests"), where("status","==","approved_dean_final"), limit(5000)))
+      ]);
+
+      let rows = [
+        ...sFinal.docs.map(d => ({ id:d.id, ...d.data() })),
+        ...sDeanApproved.docs.map(d => ({ id:d.id, ...d.data() }))
+      ];
+
+      rows = rows.filter(r => inDateRangeISO(getInDT(r), from, to));
+
+      if (year){
+        rows = rows.filter(r => String(r.student_year || "") === String(year));
+      }
+
+      if (reportMode === "student"){
+        rows = rows.filter(r => normalizeRollno(r.student_rollno || r.student?.rollno || "") === rollNeedle);
+      }
+
+      rows.sort((a,b) => String(getInDT(a)||"").localeCompare(String(getInDT(b)||"")));
+      return rows;
+    }
+
+    function buildDeanStyledWorkbook({ rows, meta }){
+      if (!window.XLSX) throw new Error("Excel library not loaded.");
+      const XLSX = window.XLSX;
+
+      const RED = "C1121F";
+      const BORDER = { style: "thin", color: { rgb: "E5E7EB" } };
+
+      const sTitle1 = {
+        font: { bold:true, sz: 18, color:{ rgb:"111827" } },
+        alignment: { horizontal:"left", vertical:"center" }
+      };
+      const sTitle2 = {
+        font: { bold:true, sz: 16, color:{ rgb: RED } },
+        alignment: { horizontal:"left", vertical:"center" }
+      };
+      const sMeta = {
+        font: { sz: 12, color:{ rgb:"111827" } },
+        alignment: { horizontal:"left", vertical:"center", wrapText:true }
+      };
+      const sTotal = {
+        font: { bold:true, sz: 13, color:{ rgb:"111827" } },
+        alignment: { horizontal:"left", vertical:"center" }
+      };
+      const sHeader = {
+        font: { bold:true, sz: 12, color:{ rgb:"FFFFFF" } },
+        fill: { fgColor: { rgb: RED } },
+        alignment: { horizontal:"center", vertical:"center", wrapText:true },
+        border: { top:BORDER, bottom:BORDER, left:BORDER, right:BORDER }
+      };
+      const sCell = {
+        font: { sz: 11, color:{ rgb:"111827" } },
+        alignment: { horizontal:"left", vertical:"top", wrapText:true },
+        border: { top:BORDER, bottom:BORDER, left:BORDER, right:BORDER }
+      };
+      const sCellCenter = {
+        ...sCell,
+        alignment: { horizontal:"center", vertical:"top", wrapText:true }
+      };
+
+      const aoa = [];
+      aoa.push(["Xavier Institute of Management and Entrepreneurship (XIME)"]);
+      aoa.push(["Leave Management System — Final Approved Requests Report"]);
+      aoa.push([""]);
+
+      aoa.push([`Prepared by: Dean (${DEAN_EMAIL})`]);
+      aoa.push([`Generated: ${meta.generatedAt}`]);
+      aoa.push([`IN datetime range: ${meta.inRange}`]);
+      aoa.push([`Year Filter: ${meta.yearFilter}`]);
+      aoa.push([`Mode: ${meta.mode}`]);
+      if (meta.roll) aoa.push([`Roll No: ${meta.roll}`]);
+
+      aoa.push([""]);
+      aoa.push([`Total Records: ${rows.length}`]);
+      aoa.push([""]);
+
+      const header = [
+        "S.No","Roll No","Student Name","Year","Hostel","Room",
+        "Out Date & Time","In Date & Time",
+        "Arrival Status",
+        "Contact","Reason"
+      ];
+      aoa.push(header);
+
+      rows.forEach((r, idx) => {
+        const roll = normalizeRollno(r.student_rollno || r.student?.rollno || "");
+        const nm = safeText(r.student_name || r.student?.name || "");
+        const year = safeText(r.student_year || "");
+        const hostel = safeText(r.student_hostel || "");
+        const room = safeText(r.student_room_no || r.student?.room || r.student?.roomNo || "");
+        const outDT = fmtDT(getOutDT(r));
+        const inDT  = fmtDT(getInDT(r));
+        const arrival = computeArrivalStatusLineDean(r);
+        const phone = safeText(r.contact_no || r.phone || r.contact || "");
+        const reason = safeText(r.reason_text || r.reason || r.reasonText || "");
+
+        aoa.push([ idx+1, roll, nm, year, hostel, room, outDT, inDT, arrival, phone, reason ]);
+      });
+
+      const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+      const rowTitle1 = 0;
+      const rowTitle2 = 1;
+      const rowMetaStart = 3;
+      const metaLinesCount = meta.roll ? 6 : 5;
+      const rowTotal = rowMetaStart + metaLinesCount + 1;
+      const rowHeader = rowTotal + 2;
+
+      const merges = [
+        { s:{r:rowTitle1,c:0}, e:{r:rowTitle1,c:10} },
+        { s:{r:rowTitle2,c:0}, e:{r:rowTitle2,c:10} },
+      ];
+      for (let i=0; i<metaLinesCount; i++){
+        merges.push({ s:{r:rowMetaStart+i,c:0}, e:{r:rowMetaStart+i,c:10} });
+      }
+      merges.push({ s:{r:rowTotal,c:0}, e:{r:rowTotal,c:10} });
+      ws["!merges"] = merges;
+
+      ws["!cols"] = [
+        { wch: 6 }, { wch: 10 }, { wch: 18 }, { wch: 6 }, { wch: 10 },
+        { wch: 8 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 12 }, { wch: 30 }
+      ];
+
+      ws["A1"].s = sTitle1;
+      ws["A2"].s = sTitle2;
+
+      for (let r=rowMetaStart; r<rowMetaStart+metaLinesCount; r++){
+        const addr = XLSX.utils.encode_cell({ r, c:0 });
+        if (ws[addr]) ws[addr].s = sMeta;
+      }
+
+      const addrTotal = XLSX.utils.encode_cell({ r:rowTotal, c:0 });
+      if (ws[addrTotal]) ws[addrTotal].s = sTotal;
+
+      for (let c=0; c<=10; c++){
+        const addr = XLSX.utils.encode_cell({ r:rowHeader, c });
+        if (ws[addr]) ws[addr].s = sHeader;
+      }
+
+      const range = XLSX.utils.decode_range(ws["!ref"]);
+      for (let r=rowHeader+1; r<=range.e.r; r++){
+        for (let c=0; c<=10; c++){
+          const addr = XLSX.utils.encode_cell({ r, c });
+          if (!ws[addr]) continue;
+          const centerCols = new Set([0,1,3,4,5,9]);
+          ws[addr].s = centerCols.has(c) ? sCellCenter : sCell;
+        }
+      }
+
+      ws["!freeze"] = { xSplit: 0, ySplit: rowHeader + 1 };
+
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "Final Approved");
+      return wb;
+    }
+
+    function downloadDeanExcel(wb, meta){
+      const XLSX = window.XLSX;
+      const stamp = new Date();
+      const yyyy = stamp.getFullYear();
+      const mm = String(stamp.getMonth()+1).padStart(2,"0");
+      const dd = String(stamp.getDate()).padStart(2,"0");
+
+      const tag = meta.modeTag || (reportMode === "student" ? `Approved_${meta.roll}` : "Approved");
+      const fileName = `XIME_${tag}_${yyyy}${mm}${dd}.xlsx`;
+      XLSX.writeFile(wb, fileName);
+    }
 
     repDownloadBtn.addEventListener("click", async () => {
-  try{
-    showToast("", "");
-    repDownloadBtn.disabled = true;
+      try{
+        showToast("", "");
+        repDownloadBtn.disabled = true;
 
-    const rows = await fetchRowsForReport();
-    if (!rows.length){
-      showToast("bad", "No records found for the selected filters.");
-      return;
-    }
+        const rows = await fetchRowsForReport();
+        if (!rows.length){
+          showToast("bad", "No records found for the selected filters.");
+          return;
+        }
 
-    const from = repFrom.value || "—";
-    const to = repTo.value || "—";
-    const year = repYear.value || "";
-    const roll = normalizeRollno(repRoll.value || "");
+        const from = repFrom.value || "—";
+        const to = repTo.value || "—";
+        const year = repYear.value || "";
+        const roll = normalizeRollno(repRoll.value || "");
 
-    const modeLabel =
-      reportMode === "student"
-        ? "Student-wise (Roll No + Timeframe)"
-        : (reportMode === "late"
-            ? "Latecomers (Verified + Late)"
-            : "Timeframe (Approved Final + Dean Approved)");
+        const modeLabel =
+          reportMode === "student"
+            ? "Student-wise (Roll No + Timeframe)"
+            : "Timeframe (Approved Final + Dean Approved)";
 
-    const meta = {
-      generatedAt: excelNowPretty(),
-      inRange: `${from} to ${to}`,
-      yearFilter: year ? `Year ${year}` : "All Years",
-      mode: modeLabel,
-      roll: (reportMode === "student") ? roll : "",
-      modeTag: reportMode === "late" ? "Latecomers" : (reportMode === "student" ? `Approved_${roll}` : "Approved")
-    };
+        const meta = {
+          generatedAt: excelNowPretty(),
+          inRange: `${from} to ${to}`,
+          yearFilter: year ? `Year ${year}` : "All Years",
+          mode: modeLabel,
+          roll: (reportMode === "student") ? roll : "",
+          modeTag: (reportMode === "student") ? `Approved_${roll}` : "Approved"
+        };
 
-    const wb = buildDeanStyledWorkbook({ rows, meta });
-    downloadDeanExcel(wb, meta);
+        const wb = buildDeanStyledWorkbook({ rows, meta });
+        downloadDeanExcel(wb, meta);
 
-    showToast("good", `Downloaded Excel with ${rows.length} records.`);
-  }catch(e){
-    console.error(e);
-    showToast("bad", e?.message || "Unable to download report.");
-  }finally{
-    repDownloadBtn.disabled = false;
-  }
-});
+        showToast("good", `Downloaded Excel with ${rows.length} records.`);
+      }catch(e){
+        console.error(e);
+        showToast("bad", e?.message || "Unable to download report.");
+      }finally{
+        repDownloadBtn.disabled = false;
+      }
+    });
 
     onAuthStateChanged(auth, async (u) => {
       if (!u){
@@ -1824,4 +1813,3 @@ function downloadDeanExcel(wb, meta){
   </script>
 </body>
 </html>
-
