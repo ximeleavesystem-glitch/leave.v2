@@ -696,7 +696,7 @@ textarea:focus{
 </div>
 
 <!-- Excel (XLSX) -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"></script>
 
 <script type="module">
   import { initializeApp } from "https://www.gstatic.com/firebasejs/9.23.0/firebase-app.js";
@@ -1895,7 +1895,8 @@ async function revokePublicGatepass(requestId, reason="rejected"){
     repToast.className = "toast";
     repToast.textContent = "";
   });
-// ===== Reports: Excel Download =====
+// ===== Reports: Excel Download (Styled like PDF) =====
+
 function inDateRangeInDT(row, fromDate, toDate){
   const inVal = getInDT(row);
   if (!inVal) return false;
@@ -1909,13 +1910,13 @@ function inDateRangeInDT(row, fromDate, toDate){
   return true;
 }
 
-function buildReportRows(){
+function buildReportSourceRows(){
   const from = (repFrom.value || "").trim();
   const to   = (repTo.value || "").trim();
   const year = String(repYear.value || "all");
   const roll = normalizeRollno(repRoll.value || "");
 
-  // only FINAL approved, and only those APPROVED BY ME (at my stage)
+  // only FINAL approved + approved by me + within IN range
   let rows = cacheAllForApprover.slice()
     .filter(r => isFinalApprovedStatus(r.status))
     .filter(r => didIAct(r.approver_chain) === "approved")
@@ -1930,38 +1931,205 @@ function buildReportRows(){
     rows = rows.filter(r => normalizeRollno(r.student_rollno || "") === roll);
   }
 
-  // newest first (IN time)
   rows.sort((a,b) => (toJSDate(getInDT(b))?.getTime()||0) - (toJSDate(getInDT(a))?.getTime()||0));
-
-  // transform to flat rows for Excel
-  return rows.map((r, i) => ({
-    "S.No": i + 1,
-    "Name": r.student_name || "",
-    "Roll No": normalizeRollno(r.student_rollno || ""),
-    "Room No": r.student_room_no || "",
-    "Year": String(getStudentYear(r) || ""),
-    "Hostel": String(getHostel(r) || ""),
-    "Reason Category": String(r.reason_category || ""),
-    "Reason": String(r.reason_text || r.reason || ""),
-    "OUT DateTime": fmtDT(getOutDT(r)),
-    "IN DateTime": fmtDT(getInDT(r)),
-    "Status": String(r.status || ""),
-    "Arrival Status": computeArrivalStatusLine(r).replace(/^✅\s*|^⚠️\s*/g, "") // cleaner text
-  }));
+  return rows;
 }
 
-function downloadExcel(rows){
+function excelNowPretty(){
+  const d = new Date();
+  // 21/2/2026, 3:11:24 pm (similar vibe to your PDF)
+  return d.toLocaleString("en-GB", { hour12:true });
+}
+
+function safeText(v){
+  return String(v ?? "").replace(/\s+/g, " ").trim();
+}
+
+function buildStyledWorkbook({ rows, meta }){
   if (!window.XLSX) throw new Error("Excel library not loaded.");
 
-  const ws = XLSX.utils.json_to_sheet(rows);
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Report");
+  const XLSX = window.XLSX;
 
+  // ---- Styles
+  const RED = "C1121F";
+  const BORDER = { style: "thin", color: { rgb: "E2E8F0" } };
+
+  const sTitle1 = {
+    font: { bold:true, sz: 18, color:{ rgb:"111827" } },
+    alignment: { horizontal:"left", vertical:"center" }
+  };
+  const sTitle2 = {
+    font: { bold:true, sz: 16, color:{ rgb: RED } },
+    alignment: { horizontal:"left", vertical:"center" }
+  };
+  const sMeta = {
+    font: { sz: 12, color:{ rgb:"111827" } },
+    alignment: { horizontal:"left", vertical:"center", wrapText:true }
+  };
+  const sMetaBold = {
+    font: { bold:true, sz: 12, color:{ rgb:"111827" } },
+    alignment: { horizontal:"left", vertical:"center" }
+  };
+  const sTotal = {
+    font: { bold:true, sz: 13, color:{ rgb:"111827" } },
+    alignment: { horizontal:"left", vertical:"center" }
+  };
+  const sHeader = {
+    font: { bold:true, sz: 12, color:{ rgb:"FFFFFF" } },
+    fill: { fgColor: { rgb: RED } },
+    alignment: { horizontal:"center", vertical:"center", wrapText:true },
+    border: { top:BORDER, bottom:BORDER, left:BORDER, right:BORDER }
+  };
+  const sCell = {
+    font: { sz: 11, color:{ rgb:"111827" } },
+    alignment: { horizontal:"left", vertical:"top", wrapText:true },
+    border: { top:BORDER, bottom:BORDER, left:BORDER, right:BORDER }
+  };
+  const sCellCenter = {
+    ...sCell,
+    alignment: { horizontal:"center", vertical:"top", wrapText:true }
+  };
+
+  // ---- Create sheet rows manually so we can style/merge
+  const aoa = [];
+
+  // Titles
+  aoa.push(["Xavier Institute of Management and Entrepreneurship (XIME)"]);
+  aoa.push(["Leave Management System — Final Approved Requests Report"]);
+  aoa.push([""]); // spacer
+
+  // Meta block (like your PDF)
+  aoa.push([`Prepared by: ${meta.preparedBy}`]);
+  aoa.push([`Generated: ${meta.generatedAt}`]);
+  aoa.push([`IN datetime range: ${meta.inRange}`]);
+  aoa.push([`Year Filter: ${meta.yearFilter}`]);
+  aoa.push([`Mode: ${meta.mode}`]);
+
+  aoa.push([""]); // spacer
+  aoa.push([`Total Records: ${rows.length}`]);
+  aoa.push([""]); // spacer
+
+  // Table header (same columns as PDF screenshot)
+  const header = [
+    "S.No",
+    "Roll No",
+    "Student Name",
+    "Year",
+    "Hostel",
+    "Room",
+    "Out Date & Time",
+    "In Date & Time",
+    "Arrival Status",
+    "Contact",
+    "Reason"
+  ];
+  aoa.push(header);
+
+  // Table data
+  rows.forEach((r, idx) => {
+    const reasonCat = safeText(r.reason_category || "");
+    const reasonTxt = safeText(r.reason_text || r.reason || "");
+    const reasonLine = reasonTxt ? `${reasonCat} — ${reasonTxt}` : reasonCat;
+
+    aoa.push([
+      idx + 1,
+      normalizeRollno(r.student_rollno || ""),
+      safeText(r.student_name || ""),
+      safeText(getStudentYear(r) || ""),
+      safeText(getHostel(r) || ""),
+      safeText(r.student_room_no || ""),
+      fmtDT(getOutDT(r)),
+      fmtDT(getInDT(r)),
+      safeText(computeArrivalStatusLine(r)).replace(/^✅\s*|^⚠️\s*/g, ""),
+      safeText(r.contact_no || r.contact || ""),
+      reasonLine
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+  // Merges for title rows (A..K)
+  ws["!merges"] = [
+    { s:{r:0,c:0}, e:{r:0,c:10} },
+    { s:{r:1,c:0}, e:{r:1,c:10} },
+    { s:{r:3,c:0}, e:{r:3,c:10} },
+    { s:{r:4,c:0}, e:{r:4,c:10} },
+    { s:{r:5,c:0}, e:{r:5,c:10} },
+    { s:{r:6,c:0}, e:{r:6,c:10} },
+    { s:{r:7,c:0}, e:{r:7,c:10} },
+    { s:{r:9,c:0}, e:{r:9,c:10} }
+  ];
+
+  // Column widths (tuned to match your PDF layout)
+  ws["!cols"] = [
+    { wch: 6 },   // S.No
+    { wch: 10 },  // Roll
+    { wch: 18 },  // Name
+    { wch: 6 },   // Year
+    { wch: 10 },  // Hostel
+    { wch: 8 },   // Room
+    { wch: 18 },  // Out
+    { wch: 18 },  // In
+    { wch: 18 },  // Arrival
+    { wch: 12 },  // Contact
+    { wch: 28 }   // Reason
+  ];
+
+  // Apply styles
+  const range = XLSX.utils.decode_range(ws["!ref"]);
+
+  const rowTitle1 = 0;
+  const rowTitle2 = 1;
+  const rowMetaStart = 3;
+  const rowTotal = 9;
+  const rowHeader = 11;
+
+  // Title styles
+  ws["A1"].s = sTitle1;
+  ws["A2"].s = sTitle2;
+
+  // Meta styles
+  for (let r = rowMetaStart; r <= rowMetaStart + 4; r++){
+    const addr = XLSX.utils.encode_cell({ r, c:0 });
+    if (ws[addr]) ws[addr].s = sMeta;
+  }
+  // Total
+  ws["A10"].s = sTotal;
+
+  // Header row style
+  for (let c = 0; c <= 10; c++){
+    const addr = XLSX.utils.encode_cell({ r: rowHeader, c });
+    if (ws[addr]) ws[addr].s = sHeader;
+  }
+
+  // Body cell styles
+  for (let r = rowHeader + 1; r <= range.e.r; r++){
+    for (let c = 0; c <= 10; c++){
+      const addr = XLSX.utils.encode_cell({ r, c });
+      if (!ws[addr]) continue;
+
+      // center some columns
+      const centerCols = new Set([0,1,3,4,5,9]);
+      ws[addr].s = centerCols.has(c) ? sCellCenter : sCell;
+    }
+  }
+
+  // Freeze panes at table header (row 12 in excel is index 11)
+  ws["!freeze"] = { xSplit: 0, ySplit: rowHeader + 1 };
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Final Approved");
+
+  return wb;
+}
+
+function downloadStyledExcel(wb){
+  const XLSX = window.XLSX;
   const stamp = new Date();
   const yyyy = stamp.getFullYear();
   const mm = String(stamp.getMonth()+1).padStart(2,"0");
   const dd = String(stamp.getDate()).padStart(2,"0");
-  const fileName = `XIME_Report_${yyyy}${mm}${dd}.xlsx`;
+  const fileName = `XIME_FinalApproved_Report_${yyyy}${mm}${dd}.xlsx`;
 
   XLSX.writeFile(wb, fileName);
 }
@@ -1973,12 +2141,23 @@ function setRepToast(msg, kind="good"){
 
 repDownload.addEventListener("click", () => {
   try{
-    const rows = buildReportRows();
+    const rows = buildReportSourceRows();
     if (!rows.length){
       setRepToast("No records found for this filter.", "bad");
       return;
     }
-    downloadExcel(rows);
+
+    const meta = {
+      preparedBy: `${(roleDoc?.name || "Approver")} (${currentUserEmailRaw})`,
+      generatedAt: excelNowPretty(),
+      inRange: `${(repFrom.value || "—")} to ${(repTo.value || "—")}`,
+      yearFilter: (repYear.value === "all") ? "All Years" : `Year ${repYear.value}`,
+      mode: (repMode === "time") ? "Timeframe (All Final Approved by Me)" : `Student-wise (${normalizeRollno(repRoll.value || "")})`
+    };
+
+    const wb = buildStyledWorkbook({ rows, meta });
+    downloadStyledExcel(wb);
+
     setRepToast(`Downloaded Excel (${rows.length} rows).`, "good");
   }catch(e){
     console.error(e);
@@ -2044,6 +2223,7 @@ repDownload.addEventListener("click", () => {
 </script>
 </body>
 </html>
+
 
 
 
