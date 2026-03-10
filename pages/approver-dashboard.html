@@ -763,13 +763,13 @@ textarea:focus{
   const requestsContainer = document.getElementById("requestsContainer");
   const historyContainer = document.getElementById("historyContainer");
 
- // History tabs
-const hApproved = document.getElementById("hApproved");
-const hRejected = document.getElementById("hRejected");
-const hEscalated = document.getElementById("hEscalated");
-const hcApproved = document.getElementById("hcApproved");
-const hcRejected = document.getElementById("hcRejected");
-const hcEscalated = document.getElementById("hcEscalated");
+  // History tabs
+  const hApproved = document.getElementById("hApproved");
+  const hRejected = document.getElementById("hRejected");
+  const hEscalated = document.getElementById("hEscalated");
+  const hcApproved = document.getElementById("hcApproved");
+  const hcRejected = document.getElementById("hcRejected");
+  const hcEscalated = document.getElementById("hcEscalated");
 
   // History filters
   const hFrom = document.getElementById("hFrom");
@@ -816,7 +816,7 @@ const hcEscalated = document.getElementById("hcEscalated");
   let reqFrom = "";
   let reqTo = "";
 
-  let activeHistoryTab = "approved"; // approved | rejected | escalated | intimation
+  let activeHistoryTab = "approved"; // approved | rejected | escalated
 
   let cacheAllForApprover = []; // pending + acted by me + escalated
 
@@ -866,7 +866,7 @@ const hcEscalated = document.getElementById("hcEscalated");
   function toJSDate(val){
     if (!val) return null;
     if (val instanceof Date) return val;
-    if (typeof val?.toDate === "function") return val.toDate(); // Timestamp
+    if (typeof val?.toDate === "function") return val.toDate();
     const d = new Date(val);
     return isNaN(d) ? null : d;
   }
@@ -1285,7 +1285,6 @@ const hcEscalated = document.getElementById("hcEscalated");
 
       const holderRole = getCurrentHolderRole(r).toLowerCase();
 
-      // ✅ NOW: Warden OR Batch Coordinator can escalate (if dean email exists)
       const canEscalate = (holderRole === "batch_coordinator" || holderRole === "warden") && !!(r.routing && r.routing.dean_email);
 
       const remarkId = `remark_${r.id}`;
@@ -1324,12 +1323,12 @@ const hcEscalated = document.getElementById("hcEscalated");
 
         <div class="actions">
           <button class="actionBtn approveBtn" data-id="${r.id}" type="button">
-  Approve
-</button>
+            Approve
+          </button>
 
-<button class="actionBtn rejectBtn" data-id="${r.id}" type="button">
-  Reject
-</button>
+          <button class="actionBtn rejectBtn" data-id="${r.id}" type="button">
+            Reject
+          </button>
         </div>
       `;
 
@@ -1388,24 +1387,27 @@ const hcEscalated = document.getElementById("hcEscalated");
   // ===== History Render =====
   function setHistoryTab(which){
     activeHistoryTab = which;
-    [hApproved, hRejected, hEscalated, hIntimation].forEach(x => x.classList.remove("active"));
+
+    [hApproved, hRejected, hEscalated].forEach(x => x.classList.remove("active"));
+
     if (which === "approved") hApproved.classList.add("active");
     if (which === "rejected") hRejected.classList.add("active");
     if (which === "escalated") hEscalated.classList.add("active");
+
     renderHistory();
   }
 
   function renderHistory(){
     let rows = [];
 
-   rows = cacheAllForApprover.slice();
-if (activeHistoryTab === "approved"){
-  rows = rows.filter(r => didIAct(r.approver_chain) === "approved");
-} else if (activeHistoryTab === "rejected"){
-  rows = rows.filter(r => didIAct(r.approver_chain) === "rejected");
-} else {
-  rows = rows.filter(r => !!(r?.escalation?.requested));
-}
+    rows = cacheAllForApprover.slice();
+    if (activeHistoryTab === "approved"){
+      rows = rows.filter(r => didIAct(r.approver_chain) === "approved");
+    } else if (activeHistoryTab === "rejected"){
+      rows = rows.filter(r => didIAct(r.approver_chain) === "rejected");
+    } else {
+      rows = rows.filter(r => !!(r?.escalation?.requested));
+    }
 
     rows = applyHistoryFilters(rows);
 
@@ -1444,11 +1446,6 @@ if (activeHistoryTab === "approved"){
 
       const arrivalLine = computeArrivalStatusLine(r);
 
-      // ✅ Reversible decision rules:
-      // - Only in Approved/Rejected tabs
-      // - Only if I acted
-      // - Only if out time not crossed
-      // - Only if NOT already escalated
       const iActed = didIAct(r.approver_chain);
       const canChange =
         (activeHistoryTab === "approved" || activeHistoryTab === "rejected") &&
@@ -1504,73 +1501,69 @@ if (activeHistoryTab === "approved"){
     hcEscalated.textContent = String(cacheAllForApprover.filter(r => !!(r?.escalation?.requested)).length);
   }
 
- // ===== Gatepass Public =====
-async function upsertPublicGatepass(requestId, requestRow){
-  const outVal = getOutDT(requestRow);
-  const inVal = getInDT(requestRow);
+  // ===== Gatepass Public =====
+  async function upsertPublicGatepass(requestId, requestRow){
+    const outVal = getOutDT(requestRow);
+    const inVal = getInDT(requestRow);
 
-  // try to detect role variable safely (won't crash if not defined)
-  const approverRole =
-    (typeof currentUserRole !== "undefined" && currentUserRole) ||
-    (typeof currentRole !== "undefined" && currentRole) ||
-    (typeof userRole !== "undefined" && userRole) ||
-    (typeof myRole !== "undefined" && myRole) ||
-    (typeof role !== "undefined" && role) ||
-    "";
+    const approverRole =
+      (typeof currentUserRole !== "undefined" && currentUserRole) ||
+      (typeof currentRole !== "undefined" && currentRole) ||
+      (typeof userRole !== "undefined" && userRole) ||
+      (typeof myRole !== "undefined" && myRole) ||
+      (typeof role !== "undefined" && role) ||
+      "";
 
-  // prefer a non-lowercased email if you already have it; fallback to lower
-  const approverEmail =
-    (typeof currentUserEmail !== "undefined" && currentUserEmail) ||
-    (typeof currentUserEmailLower !== "undefined" && currentUserEmailLower) ||
-    "";
+    const approverEmail =
+      (typeof currentUserEmail !== "undefined" && currentUserEmail) ||
+      (typeof currentUserEmailLower !== "undefined" && currentUserEmailLower) ||
+      "";
 
-  const payload = {
-    status: "approved",
-    approved_public_at: isoNow(),
+    const payload = {
+      status: "approved",
+      approved_public_at: isoNow(),
 
-    // ✅ ADD THESE (THIS FIXES "Approved by" in security view)
-    approved_by_email: String(approverEmail || "").toLowerCase(),
-    approved_by_role: String(approverRole || ""),
+      approved_by_email: String(approverEmail || "").toLowerCase(),
+      approved_by_role: String(approverRole || ""),
 
-    student_name: requestRow.student_name || "",
-    student_rollno: requestRow.student_rollno || "",
-    student_room_no: requestRow.student_room_no || "",
-    student_email: requestRow.student_email || "",
-    student_uid: requestRow.student_uid || "",
+      student_name: requestRow.student_name || "",
+      student_rollno: requestRow.student_rollno || "",
+      student_room_no: requestRow.student_room_no || "",
+      student_email: requestRow.student_email || "",
+      student_uid: requestRow.student_uid || "",
 
-    out_datetime: outVal || "",
-    in_datetime: inVal || "",
+      out_datetime: outVal || "",
+      in_datetime: inVal || "",
 
-    reason_category: requestRow.reason_category || "",
-    reason_text: requestRow.reason_text || requestRow.reason || "",
-    contact_no: requestRow.contact_no || "",
+      reason_category: requestRow.reason_category || "",
+      reason_text: requestRow.reason_text || requestRow.reason || "",
+      contact_no: requestRow.contact_no || "",
 
-    // your student photo is already coming here (good)
-    photo_url: requestRow.student_photo_url || requestRow.photo_url || "",
+      photo_url: requestRow.student_photo_url || requestRow.photo_url || "",
 
-    updatedAt: serverTimestamp(),
-    updated_at: serverTimestamp()
-  };
+      updatedAt: serverTimestamp(),
+      updated_at: serverTimestamp()
+    };
 
-  await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
-}
-
-async function revokePublicGatepass(requestId, reason="rejected"){
-  const payload = {
-    status: "revoked",
-    revoked_at: serverTimestamp(),
-    revokedAt: serverTimestamp(),
-    revoked_by: currentUserEmailLower,
-    revoke_reason: String(reason || "rejected"),
-    updatedAt: serverTimestamp(),
-    updated_at: serverTimestamp()
-  };
-  try{
     await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
-  }catch(e){
-    console.warn("Unable to revoke gatepass_public:", e);
   }
-}
+
+  async function revokePublicGatepass(requestId, reason="rejected"){
+    const payload = {
+      status: "revoked",
+      revoked_at: serverTimestamp(),
+      revokedAt: serverTimestamp(),
+      revoked_by: currentUserEmailLower,
+      revoke_reason: String(reason || "rejected"),
+      updatedAt: serverTimestamp(),
+      updated_at: serverTimestamp()
+    };
+    try{
+      await setDoc(doc(db, "gatepass_public", requestId), payload, { merge: true });
+    }catch(e){
+      console.warn("Unable to revoke gatepass_public:", e);
+    }
+  }
 
   // ===== Approve / Reject helpers =====
   function ensureDeanStage(chain, deanEmail){
@@ -1650,7 +1643,6 @@ async function revokePublicGatepass(requestId, reason="rejected"){
       const escEl = document.getElementById(`esc_${requestId}`);
       const wantEsc = !!(escEl && escEl.checked);
 
-      // ✅ Warden OR BC can escalate now
       if ((holderRole === "warden" || holderRole === "batch_coordinator") && wantEsc && deanEmail){
         chain = ensureDeanStage(chain, deanEmail);
         updates.approver_chain = chain;
@@ -1668,7 +1660,6 @@ async function revokePublicGatepass(requestId, reason="rejected"){
         };
 
       } else {
-        // ✅ normal final approval at L1
         updates.status = "approved_final";
         updates.escalation = { ...(r.escalation || {}), requested: false, dean_action: "not_required" };
         clearCurrentFields(updates);
@@ -1741,7 +1732,6 @@ async function revokePublicGatepass(requestId, reason="rejected"){
     const r = cacheAllForApprover.find(x => x.id === requestId);
     if (!r) return;
 
-    // hard rules
     if (!didIAct(r.approver_chain)) return;
     if (!isBeforeOutTime(r)) return;
     if (r?.escalation?.requested) {
@@ -1749,7 +1739,7 @@ async function revokePublicGatepass(requestId, reason="rejected"){
       return;
     }
 
-    const currentAction = didIAct(r.approver_chain); // approved/rejected
+    const currentAction = didIAct(r.approver_chain);
     const newAction = (currentAction === "approved") ? "rejected" : "approved";
 
     const ok = confirm(`Change your decision?\n\nCurrent: ${currentAction.toUpperCase()}\nNew: ${newAction.toUpperCase()}\n\nAllowed only until OUT time.`);
@@ -1765,7 +1755,6 @@ async function revokePublicGatepass(requestId, reason="rejected"){
       updatedAt: serverTimestamp()
     };
 
-    // Only handle L1 final statuses here (safe + clean)
     if (newAction === "approved"){
       updates.status = "approved_final";
       updates.escalation = { ...(r.escalation || {}), requested: false, dean_action: "not_required" };
@@ -1779,7 +1768,6 @@ async function revokePublicGatepass(requestId, reason="rejected"){
     try{
       await updateDoc(doc(db, "leave_requests", requestId), updates);
 
-      // gatepass public sync
       if (newAction === "approved"){
         await upsertPublicGatepass(requestId, { ...r, ...updates });
       } else {
@@ -1837,7 +1825,7 @@ async function revokePublicGatepass(requestId, reason="rejected"){
     renderHistory();
   });
 
-  // ===== Reports UI (unchanged) =====
+  // ===== Reports UI =====
   function setRepMode(mode){
     repMode = mode;
     repModeTime.classList.toggle("active", mode === "time");
@@ -1895,275 +1883,253 @@ async function revokePublicGatepass(requestId, reason="rejected"){
     repToast.className = "toast";
     repToast.textContent = "";
   });
-// ===== Reports: Excel Download (Styled like PDF) =====
 
-function inDateRangeInDT(row, fromDate, toDate){
-  const inVal = getInDT(row);
-  if (!inVal) return false;
-  const inDate = toJSDate(inVal);
-  if (!inDate) return false;
+  // ===== Reports: Excel Download =====
 
-  const s = parseDateStart(fromDate);
-  const e = parseDateEnd(toDate);
-  if (s && inDate < s) return false;
-  if (e && inDate > e) return false;
-  return true;
-}
+  function inDateRangeInDT(row, fromDate, toDate){
+    const inVal = getInDT(row);
+    if (!inVal) return false;
+    const inDate = toJSDate(inVal);
+    if (!inDate) return false;
 
-function buildReportSourceRows(){
-  const from = (repFrom.value || "").trim();
-  const to   = (repTo.value || "").trim();
-  const year = String(repYear.value || "all");
-  const roll = normalizeRollno(repRoll.value || "");
-
-  // only FINAL approved + approved by me + within IN range
-  let rows = cacheAllForApprover.slice()
-    .filter(r => isFinalApprovedStatus(r.status))
-    .filter(r => didIAct(r.approver_chain) === "approved")
-    .filter(r => inDateRangeInDT(r, from, to));
-
-  if (year !== "all"){
-    rows = rows.filter(r => String(getStudentYear(r)) === year);
+    const s = parseDateStart(fromDate);
+    const e = parseDateEnd(toDate);
+    if (s && inDate < s) return false;
+    if (e && inDate > e) return false;
+    return true;
   }
 
-  if (repMode === "student"){
-    if (!roll) throw new Error("Enter Student Roll No for Student-wise report.");
-    rows = rows.filter(r => normalizeRollno(r.student_rollno || "") === roll);
-  }
+  function buildReportSourceRows(){
+    const from = (repFrom.value || "").trim();
+    const to   = (repTo.value || "").trim();
+    const year = String(repYear.value || "all");
+    const roll = normalizeRollno(repRoll.value || "");
 
-  rows.sort((a,b) => (toJSDate(getInDT(b))?.getTime()||0) - (toJSDate(getInDT(a))?.getTime()||0));
-  return rows;
-}
+    let rows = cacheAllForApprover.slice()
+      .filter(r => isFinalApprovedStatus(r.status))
+      .filter(r => didIAct(r.approver_chain) === "approved")
+      .filter(r => inDateRangeInDT(r, from, to));
 
-function excelNowPretty(){
-  const d = new Date();
-  // 21/2/2026, 3:11:24 pm (similar vibe to your PDF)
-  return d.toLocaleString("en-GB", { hour12:true });
-}
-
-function safeText(v){
-  return String(v ?? "").replace(/\s+/g, " ").trim();
-}
-
-function buildStyledWorkbook({ rows, meta }){
-  if (!window.XLSX) throw new Error("Excel library not loaded.");
-
-  const XLSX = window.XLSX;
-
-  // ---- Styles
-  const RED = "C1121F";
-  const BORDER = { style: "thin", color: { rgb: "E2E8F0" } };
-
-  const sTitle1 = {
-    font: { bold:true, sz: 18, color:{ rgb:"111827" } },
-    alignment: { horizontal:"left", vertical:"center" }
-  };
-  const sTitle2 = {
-    font: { bold:true, sz: 16, color:{ rgb: RED } },
-    alignment: { horizontal:"left", vertical:"center" }
-  };
-  const sMeta = {
-    font: { sz: 12, color:{ rgb:"111827" } },
-    alignment: { horizontal:"left", vertical:"center", wrapText:true }
-  };
-  const sMetaBold = {
-    font: { bold:true, sz: 12, color:{ rgb:"111827" } },
-    alignment: { horizontal:"left", vertical:"center" }
-  };
-  const sTotal = {
-    font: { bold:true, sz: 13, color:{ rgb:"111827" } },
-    alignment: { horizontal:"left", vertical:"center" }
-  };
-  const sHeader = {
-    font: { bold:true, sz: 12, color:{ rgb:"FFFFFF" } },
-    fill: { fgColor: { rgb: RED } },
-    alignment: { horizontal:"center", vertical:"center", wrapText:true },
-    border: { top:BORDER, bottom:BORDER, left:BORDER, right:BORDER }
-  };
-  const sCell = {
-    font: { sz: 11, color:{ rgb:"111827" } },
-    alignment: { horizontal:"left", vertical:"top", wrapText:true },
-    border: { top:BORDER, bottom:BORDER, left:BORDER, right:BORDER }
-  };
-  const sCellCenter = {
-    ...sCell,
-    alignment: { horizontal:"center", vertical:"top", wrapText:true }
-  };
-
-  // ---- Create sheet rows manually so we can style/merge
-  const aoa = [];
-
-  // Titles
-  aoa.push(["Xavier Institute of Management and Entrepreneurship (XIME)"]);
-  aoa.push(["Leave Management System — Final Approved Requests Report"]);
-  aoa.push([""]); // spacer
-
-  // Meta block (like your PDF)
-  aoa.push([`Prepared by: ${meta.preparedBy}`]);
-  aoa.push([`Generated: ${meta.generatedAt}`]);
-  aoa.push([`IN datetime range: ${meta.inRange}`]);
-  aoa.push([`Year Filter: ${meta.yearFilter}`]);
-  aoa.push([`Mode: ${meta.mode}`]);
-
-  aoa.push([""]); // spacer
-  aoa.push([`Total Records: ${rows.length}`]);
-  aoa.push([""]); // spacer
-
-  // Table header (same columns as PDF screenshot)
-  const header = [
-    "S.No",
-    "Roll No",
-    "Student Name",
-    "Year",
-    "Hostel",
-    "Room",
-    "Out Date & Time",
-    "In Date & Time",
-    "Arrival Status",
-    "Contact",
-    "Reason"
-  ];
-  aoa.push(header);
-
-  // Table data
-  rows.forEach((r, idx) => {
-    const reasonCat = safeText(r.reason_category || "");
-    const reasonTxt = safeText(r.reason_text || r.reason || "");
-    const reasonLine = reasonTxt ? `${reasonCat} — ${reasonTxt}` : reasonCat;
-
-    aoa.push([
-      idx + 1,
-      normalizeRollno(r.student_rollno || ""),
-      safeText(r.student_name || ""),
-      safeText(getStudentYear(r) || ""),
-      safeText(getHostel(r) || ""),
-      safeText(r.student_room_no || ""),
-      fmtDT(getOutDT(r)),
-      fmtDT(getInDT(r)),
-      safeText(computeArrivalStatusLine(r)).replace(/^✅\s*|^⚠️\s*/g, ""),
-      safeText(r.contact_no || r.contact || ""),
-      reasonLine
-    ]);
-  });
-
-  const ws = XLSX.utils.aoa_to_sheet(aoa);
-
-  // Merges for title rows (A..K)
-  ws["!merges"] = [
-    { s:{r:0,c:0}, e:{r:0,c:10} },
-    { s:{r:1,c:0}, e:{r:1,c:10} },
-    { s:{r:3,c:0}, e:{r:3,c:10} },
-    { s:{r:4,c:0}, e:{r:4,c:10} },
-    { s:{r:5,c:0}, e:{r:5,c:10} },
-    { s:{r:6,c:0}, e:{r:6,c:10} },
-    { s:{r:7,c:0}, e:{r:7,c:10} },
-    { s:{r:9,c:0}, e:{r:9,c:10} }
-  ];
-
-  // Column widths (tuned to match your PDF layout)
-  ws["!cols"] = [
-    { wch: 6 },   // S.No
-    { wch: 10 },  // Roll
-    { wch: 18 },  // Name
-    { wch: 6 },   // Year
-    { wch: 10 },  // Hostel
-    { wch: 8 },   // Room
-    { wch: 18 },  // Out
-    { wch: 18 },  // In
-    { wch: 18 },  // Arrival
-    { wch: 12 },  // Contact
-    { wch: 28 }   // Reason
-  ];
-
-  // Apply styles
-  const range = XLSX.utils.decode_range(ws["!ref"]);
-
-  const rowTitle1 = 0;
-  const rowTitle2 = 1;
-  const rowMetaStart = 3;
-  const rowTotal = 9;
-  const rowHeader = 11;
-
-  // Title styles
-  ws["A1"].s = sTitle1;
-  ws["A2"].s = sTitle2;
-
-  // Meta styles
-  for (let r = rowMetaStart; r <= rowMetaStart + 4; r++){
-    const addr = XLSX.utils.encode_cell({ r, c:0 });
-    if (ws[addr]) ws[addr].s = sMeta;
-  }
-  // Total
-  ws["A10"].s = sTotal;
-
-  // Header row style
-  for (let c = 0; c <= 10; c++){
-    const addr = XLSX.utils.encode_cell({ r: rowHeader, c });
-    if (ws[addr]) ws[addr].s = sHeader;
-  }
-
-  // Body cell styles
-  for (let r = rowHeader + 1; r <= range.e.r; r++){
-    for (let c = 0; c <= 10; c++){
-      const addr = XLSX.utils.encode_cell({ r, c });
-      if (!ws[addr]) continue;
-
-      // center some columns
-      const centerCols = new Set([0,1,3,4,5,9]);
-      ws[addr].s = centerCols.has(c) ? sCellCenter : sCell;
-    }
-  }
-
-  // Freeze panes at table header (row 12 in excel is index 11)
-  ws["!freeze"] = { xSplit: 0, ySplit: rowHeader + 1 };
-
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, "Final Approved");
-
-  return wb;
-}
-
-function downloadStyledExcel(wb){
-  const XLSX = window.XLSX;
-  const stamp = new Date();
-  const yyyy = stamp.getFullYear();
-  const mm = String(stamp.getMonth()+1).padStart(2,"0");
-  const dd = String(stamp.getDate()).padStart(2,"0");
-  const fileName = `XIME_FinalApproved_Report_${yyyy}${mm}${dd}.xlsx`;
-
-  XLSX.writeFile(wb, fileName);
-}
-
-function setRepToast(msg, kind="good"){
-  repToast.className = `toast show ${kind}`;
-  repToast.textContent = msg;
-}
-
-repDownload.addEventListener("click", () => {
-  try{
-    const rows = buildReportSourceRows();
-    if (!rows.length){
-      setRepToast("No records found for this filter.", "bad");
-      return;
+    if (year !== "all"){
+      rows = rows.filter(r => String(getStudentYear(r)) === year);
     }
 
-    const meta = {
-      preparedBy: `${(roleDoc?.name || "Approver")} (${currentUserEmailRaw})`,
-      generatedAt: excelNowPretty(),
-      inRange: `${(repFrom.value || "—")} to ${(repTo.value || "—")}`,
-      yearFilter: (repYear.value === "all") ? "All Years" : `Year ${repYear.value}`,
-      mode: (repMode === "time") ? "Timeframe (All Final Approved by Me)" : `Student-wise (${normalizeRollno(repRoll.value || "")})`
+    if (repMode === "student"){
+      if (!roll) throw new Error("Enter Student Roll No for Student-wise report.");
+      rows = rows.filter(r => normalizeRollno(r.student_rollno || "") === roll);
+    }
+
+    rows.sort((a,b) => (toJSDate(getInDT(b))?.getTime()||0) - (toJSDate(getInDT(a))?.getTime()||0));
+    return rows;
+  }
+
+  function excelNowPretty(){
+    const d = new Date();
+    return d.toLocaleString("en-GB", { hour12:true });
+  }
+
+  function safeText(v){
+    return String(v ?? "").replace(/\s+/g, " ").trim();
+  }
+
+  function buildStyledWorkbook({ rows, meta }){
+    if (!window.XLSX) throw new Error("Excel library not loaded.");
+
+    const XLSX = window.XLSX;
+
+    const RED = "C1121F";
+    const BORDER = { style: "thin", color: { rgb: "E2E8F0" } };
+
+    const sTitle1 = {
+      font: { bold:true, sz: 18, color:{ rgb:"111827" } },
+      alignment: { horizontal:"left", vertical:"center" }
+    };
+    const sTitle2 = {
+      font: { bold:true, sz: 16, color:{ rgb: RED } },
+      alignment: { horizontal:"left", vertical:"center" }
+    };
+    const sMeta = {
+      font: { sz: 12, color:{ rgb:"111827" } },
+      alignment: { horizontal:"left", vertical:"center", wrapText:true }
+    };
+    const sTotal = {
+      font: { bold:true, sz: 13, color:{ rgb:"111827" } },
+      alignment: { horizontal:"left", vertical:"center" }
+    };
+    const sHeader = {
+      font: { bold:true, sz: 12, color:{ rgb:"FFFFFF" } },
+      fill: { fgColor: { rgb: RED } },
+      alignment: { horizontal:"center", vertical:"center", wrapText:true },
+      border: { top:BORDER, bottom:BORDER, left:BORDER, right:BORDER }
+    };
+    const sCell = {
+      font: { sz: 11, color:{ rgb:"111827" } },
+      alignment: { horizontal:"left", vertical:"top", wrapText:true },
+      border: { top:BORDER, bottom:BORDER, left:BORDER, right:BORDER }
+    };
+    const sCellCenter = {
+      ...sCell,
+      alignment: { horizontal:"center", vertical:"top", wrapText:true }
     };
 
-    const wb = buildStyledWorkbook({ rows, meta });
-    downloadStyledExcel(wb);
+    const aoa = [];
 
-    setRepToast(`Downloaded Excel (${rows.length} rows).`, "good");
-  }catch(e){
-    console.error(e);
-    setRepToast(e?.message || "Unable to download report.", "bad");
+    aoa.push(["Xavier Institute of Management and Entrepreneurship (XIME)"]);
+    aoa.push(["Leave Management System — Final Approved Requests Report"]);
+    aoa.push([""]);
+
+    aoa.push([`Prepared by: ${meta.preparedBy}`]);
+    aoa.push([`Generated: ${meta.generatedAt}`]);
+    aoa.push([`IN datetime range: ${meta.inRange}`]);
+    aoa.push([`Year Filter: ${meta.yearFilter}`]);
+    aoa.push([`Mode: ${meta.mode}`]);
+
+    aoa.push([""]);
+    aoa.push([`Total Records: ${rows.length}`]);
+    aoa.push([""]);
+
+    const header = [
+      "S.No",
+      "Roll No",
+      "Student Name",
+      "Year",
+      "Hostel",
+      "Room",
+      "Out Date & Time",
+      "In Date & Time",
+      "Arrival Status",
+      "Contact",
+      "Reason"
+    ];
+    aoa.push(header);
+
+    rows.forEach((r, idx) => {
+      const reasonCat = safeText(r.reason_category || "");
+      const reasonTxt = safeText(r.reason_text || r.reason || "");
+      const reasonLine = reasonTxt ? `${reasonCat} — ${reasonTxt}` : reasonCat;
+
+      aoa.push([
+        idx + 1,
+        normalizeRollno(r.student_rollno || ""),
+        safeText(r.student_name || ""),
+        safeText(getStudentYear(r) || ""),
+        safeText(getHostel(r) || ""),
+        safeText(r.student_room_no || ""),
+        fmtDT(getOutDT(r)),
+        fmtDT(getInDT(r)),
+        safeText(computeArrivalStatusLine(r)).replace(/^✅\s*|^⚠️\s*/g, ""),
+        safeText(r.contact_no || r.contact || ""),
+        reasonLine
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+
+    ws["!merges"] = [
+      { s:{r:0,c:0}, e:{r:0,c:10} },
+      { s:{r:1,c:0}, e:{r:1,c:10} },
+      { s:{r:3,c:0}, e:{r:3,c:10} },
+      { s:{r:4,c:0}, e:{r:4,c:10} },
+      { s:{r:5,c:0}, e:{r:5,c:10} },
+      { s:{r:6,c:0}, e:{r:6,c:10} },
+      { s:{r:7,c:0}, e:{r:7,c:10} },
+      { s:{r:9,c:0}, e:{r:9,c:10} }
+    ];
+
+    ws["!cols"] = [
+      { wch: 6 },
+      { wch: 10 },
+      { wch: 18 },
+      { wch: 6 },
+      { wch: 10 },
+      { wch: 8 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 18 },
+      { wch: 12 },
+      { wch: 28 }
+    ];
+
+    const range = XLSX.utils.decode_range(ws["!ref"]);
+
+    const rowMetaStart = 3;
+    const rowHeader = 11;
+
+    ws["A1"].s = sTitle1;
+    ws["A2"].s = sTitle2;
+
+    for (let r = rowMetaStart; r <= rowMetaStart + 4; r++){
+      const addr = XLSX.utils.encode_cell({ r, c:0 });
+      if (ws[addr]) ws[addr].s = sMeta;
+    }
+
+    ws["A10"].s = sTotal;
+
+    for (let c = 0; c <= 10; c++){
+      const addr = XLSX.utils.encode_cell({ r: rowHeader, c });
+      if (ws[addr]) ws[addr].s = sHeader;
+    }
+
+    for (let r = rowHeader + 1; r <= range.e.r; r++){
+      for (let c = 0; c <= 10; c++){
+        const addr = XLSX.utils.encode_cell({ r, c });
+        if (!ws[addr]) continue;
+
+        const centerCols = new Set([0,1,3,4,5,9]);
+        ws[addr].s = centerCols.has(c) ? sCellCenter : sCell;
+      }
+    }
+
+    ws["!freeze"] = { xSplit: 0, ySplit: rowHeader + 1 };
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Final Approved");
+
+    return wb;
   }
-});
+
+  function downloadStyledExcel(wb){
+    const XLSX = window.XLSX;
+    const stamp = new Date();
+    const yyyy = stamp.getFullYear();
+    const mm = String(stamp.getMonth()+1).padStart(2,"0");
+    const dd = String(stamp.getDate()).padStart(2,"0");
+    const fileName = `XIME_FinalApproved_Report_${yyyy}${mm}${dd}.xlsx`;
+
+    XLSX.writeFile(wb, fileName);
+  }
+
+  function setRepToast(msg, kind="good"){
+    repToast.className = `toast show ${kind}`;
+    repToast.textContent = msg;
+  }
+
+  repDownload.addEventListener("click", () => {
+    try{
+      const rows = buildReportSourceRows();
+      if (!rows.length){
+        setRepToast("No records found for this filter.", "bad");
+        return;
+      }
+
+      const meta = {
+        preparedBy: `${(roleDoc?.name || "Approver")} (${currentUserEmailRaw})`,
+        generatedAt: excelNowPretty(),
+        inRange: `${(repFrom.value || "—")} to ${(repTo.value || "—")}`,
+        yearFilter: (repYear.value === "all") ? "All Years" : `Year ${repYear.value}`,
+        mode: (repMode === "time") ? "Timeframe (All Final Approved by Me)" : `Student-wise (${normalizeRollno(repRoll.value || "")})`
+      };
+
+      const wb = buildStyledWorkbook({ rows, meta });
+      downloadStyledExcel(wb);
+
+      setRepToast(`Downloaded Excel (${rows.length} rows).`, "good");
+    }catch(e){
+      console.error(e);
+      setRepToast(e?.message || "Unable to download report.", "bad");
+    }
+  });
+
   // ===== Auth boot =====
   onAuthStateChanged(auth, async (u) => {
     if (!u){
@@ -2200,7 +2166,6 @@ repDownload.addEventListener("click", () => {
       updateApproverUI();
       showPage("dashboard");
 
-      // default report dates: this month
       const now = new Date();
       const first = new Date(now.getFullYear(), now.getMonth(), 1);
       repFrom.value = dateToStr(first);
@@ -2223,9 +2188,3 @@ repDownload.addEventListener("click", () => {
 </script>
 </body>
 </html>
-
-
-
-
-
-
